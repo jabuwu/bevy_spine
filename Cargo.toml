@@ -1,0 +1,8 @@
+[package]
+name = "bevy_spine"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+rusty_spine = "0.1.0"
+bevy = "0.8"
