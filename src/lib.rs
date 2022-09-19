@@ -34,6 +34,7 @@ impl Plugin for SpinePlugin {
         });
         app.add_asset::<Atlas>()
             .add_asset::<SkeletonJson>()
+            .add_asset::<SkeletonData>()
             .init_asset_loader::<AtlasLoader>()
             .init_asset_loader::<SkeletonJsonLoader>()
             .add_event::<SpineReadyEvent>()
@@ -85,8 +86,7 @@ impl SpineLoader {
 #[derive(Default, Bundle)]
 pub struct SpineBundle {
     pub loader: SpineLoader,
-    pub atlas: Handle<Atlas>,
-    pub json: Handle<SkeletonJson>,
+    pub skeleton: Handle<SkeletonData>,
     pub transform: Transform,
     pub global_transform: GlobalTransform,
     pub visibility: Visibility,
@@ -103,17 +103,13 @@ struct SpineLoadLocal {
 }
 
 fn spine_load(
-    mut skeleton_query: Query<(
-        &mut SpineLoader,
-        Entity,
-        &Handle<Atlas>,
-        &Handle<SkeletonJson>,
-    )>,
+    mut skeleton_query: Query<(&mut SpineLoader, Entity, &Handle<SkeletonData>)>,
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<ColorMaterial>>,
     mut ready_event: EventWriter<SpineReadyEvent>,
     mut local: Local<SpineLoadLocal>,
+    mut skeleton_data_assets: ResMut<Assets<SkeletonData>>,
     atlases: ResMut<Assets<Atlas>>,
     jsons: ResMut<Assets<SkeletonJson>>,
 ) {
@@ -121,25 +117,44 @@ fn spine_load(
         ready_event.send(SpineReadyEvent(*entity));
     }
     local.ready = vec![];
-    for (mut loader, entity, atlas_handle, json_handle) in skeleton_query.iter_mut() {
+    for (mut loader, entity, data_handle) in skeleton_query.iter_mut() {
         if matches!(loader.as_ref(), SpineLoader::Loading) {
-            let atlas = if let Some(atlas) = atlases.get(atlas_handle) {
+            let skeleton_data_asset =
+                if let Some(skeleton_data_asset) = skeleton_data_assets.get_mut(data_handle) {
+                    skeleton_data_asset
+                } else {
+                    continue;
+                };
+            let atlas = if let Some(atlas) = atlases.get(&skeleton_data_asset.atlas) {
                 atlas
             } else {
                 continue;
             };
-            let json = if let Some(json) = jsons.get(json_handle) {
+            let json = if let Some(json) = jsons.get(&skeleton_data_asset.json) {
                 json
             } else {
                 continue;
             };
-            let skeleton_json = rusty_spine::SkeletonJson::new(atlas.atlas.clone());
-            let skeleton_data = match skeleton_json.read_skeleton_data(&json.json) {
-                Ok(skeleton_data) => Arc::new(skeleton_data),
-                Err(_err) => {
-                    // TODO: print error?
-                    *loader = SpineLoader::Loading;
-                    continue;
+            let skeleton_json = if let Some(skeleton_json) = &skeleton_data_asset.loader {
+                skeleton_json
+            } else {
+                skeleton_data_asset.loader =
+                    Some(rusty_spine::SkeletonJson::new(atlas.atlas.clone()));
+                &skeleton_data_asset.loader.as_ref().unwrap()
+            };
+            let skeleton_data = if let Some(skeleton_data) = &skeleton_data_asset.data {
+                skeleton_data.clone()
+            } else {
+                match skeleton_json.read_skeleton_data(&json.json) {
+                    Ok(skeleton_data) => {
+                        skeleton_data_asset.data = Some(Arc::new(skeleton_data));
+                        skeleton_data_asset.data.as_ref().unwrap().clone()
+                    }
+                    Err(_err) => {
+                        // TODO: print error?
+                        *loader = SpineLoader::Loading;
+                        continue;
+                    }
                 }
             };
             let animation_state_data = Arc::new(AnimationStateData::new(skeleton_data.clone()));

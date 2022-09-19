@@ -2,6 +2,7 @@ use std::{path::Path, sync::Arc};
 
 use bevy::{
     asset::{AssetLoader, LoadContext, LoadedAsset},
+    prelude::Handle,
     reflect::TypeUuid,
     utils::BoxedFuture,
 };
@@ -70,5 +71,25 @@ impl AssetLoader for SkeletonJsonLoader {
 
     fn extensions(&self) -> &[&str] {
         &["json"]
+    }
+}
+
+#[derive(Debug, TypeUuid)]
+#[uuid = "7796a37b-37a4-49ea-bf4e-fb7344aa6015"]
+pub struct SkeletonData {
+    pub json: Handle<SkeletonJson>,
+    pub atlas: Handle<Atlas>,
+    pub loader: Option<rusty_spine::SkeletonJson>,
+    pub data: Option<Arc<rusty_spine::SkeletonData>>,
+}
+
+impl SkeletonData {
+    pub fn new_from_json(json: Handle<SkeletonJson>, atlas: Handle<Atlas>) -> Self {
+        Self {
+            json,
+            atlas,
+            loader: None,
+            data: None,
+        }
     }
 }

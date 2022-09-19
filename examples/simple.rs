@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 use bevy_spine::{
-    SkeletonController, Spine, SpineBundle, SpinePlugin, SpineReadyEvent, SpineSystem,
+    SkeletonController, SkeletonData, Spine, SpineBundle, SpinePlugin, SpineReadyEvent, SpineSystem,
 };
 
 fn main() {
@@ -12,12 +12,21 @@ fn main() {
         .run();
 }
 
-fn setup(asset_server: Res<AssetServer>, mut commands: Commands) {
+fn setup(
+    asset_server: Res<AssetServer>,
+    mut commands: Commands,
+    mut skeletons: ResMut<Assets<SkeletonData>>,
+) {
     commands.spawn_bundle(Camera2dBundle::default());
 
+    let skeleton = SkeletonData::new_from_json(
+        asset_server.load("spineboy/export/spineboy-pro.json"),
+        asset_server.load("spineboy/export/spineboy.atlas"),
+    );
+    let skeleton_handle = skeletons.add(skeleton);
+
     commands.spawn_bundle(SpineBundle {
-        atlas: asset_server.load("spineboy/export/spineboy.atlas"),
-        json: asset_server.load("spineboy/export/spineboy-pro.json"),
+        skeleton: skeleton_handle.clone(),
         transform: Transform::from_xyz(0., -200., 0.).with_scale(Vec3::ONE * 0.5),
         ..Default::default()
     });
