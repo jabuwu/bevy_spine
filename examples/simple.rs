@@ -1,12 +1,14 @@
 use bevy::prelude::*;
-use bevy_spine::{Spine, SpineBundle, SpinePlugin, SpineReadyEvent, SpineSystem};
+use bevy_spine::{
+    SkeletonController, Spine, SpineBundle, SpinePlugin, SpineReadyEvent, SpineSystem,
+};
 
 fn main() {
     App::new()
         .add_plugins(DefaultPlugins)
         .add_plugin(SpinePlugin)
         .add_startup_system(setup)
-        .add_system(on_spawn.after(SpineSystem::Load))
+        .add_system(on_spawn.before(SpineSystem::Update))
         .run();
 }
 
@@ -27,11 +29,10 @@ fn on_spawn(
 ) {
     for event in spine_ready_event.iter() {
         if let Ok(mut spine) = spine_query.get_mut(event.0) {
-            if let Some(controller) = spine.controller_mut() {
-                let _ = controller
-                    .animation_state
-                    .set_animation_by_name(0, "portal", true);
-            }
+            let Spine(SkeletonController {
+                animation_state, ..
+            }) = spine.as_mut();
+            let _ = animation_state.set_animation_by_name(0, "portal", true);
         }
     }
 }
