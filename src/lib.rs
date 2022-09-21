@@ -1,12 +1,20 @@
-use std::{mem::take, sync::Arc};
+use std::{
+    collections::VecDeque,
+    mem::take,
+    sync::{Arc, Mutex},
+};
 
 use assets::{AtlasLoader, SkeletonJsonLoader};
 use bevy::{
     prelude::*,
-    render::{mesh::Indices, render_resource::PrimitiveTopology},
+    render::{
+        mesh::{Indices, MeshVertexAttribute},
+        render_resource::{PrimitiveTopology, VertexFormat},
+    },
     sprite::Mesh2dHandle,
 };
-use rusty_spine::{AnimationStateData, CullDirection, SkeletonControllerSettings};
+use rusty::EventType;
+use rusty_spine::{draw::CullDirection, AnimationStateData, SkeletonControllerSettings};
 
 pub use assets::*;
 pub use rusty_spine as rusty;
@@ -38,6 +46,7 @@ impl Plugin for SpinePlugin {
             .init_asset_loader::<AtlasLoader>()
             .init_asset_loader::<SkeletonJsonLoader>()
             .add_event::<SpineReadyEvent>()
+            .add_event::<SpineEvent>()
             .add_system(spine_load.label(SpineSystem::Load))
             .add_system(
                 spine_update
@@ -96,6 +105,11 @@ pub struct SpineBundle {
 #[derive(Clone)]
 pub struct SpineReadyEvent(pub Entity);
 
+#[derive(Clone)]
+pub struct SpineEvent {
+    pub name: String,
+}
+
 #[derive(Default)]
 struct SpineLoadLocal {
     // used for a one-frame delay in sending ready events
@@ -107,14 +121,14 @@ fn spine_load(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<ColorMaterial>>,
-    mut ready_event: EventWriter<SpineReadyEvent>,
+    mut ready_events: EventWriter<SpineReadyEvent>,
     mut local: Local<SpineLoadLocal>,
     mut skeleton_data_assets: ResMut<Assets<SkeletonData>>,
     atlases: ResMut<Assets<Atlas>>,
     jsons: ResMut<Assets<SkeletonJson>>,
 ) {
     for entity in local.ready.iter() {
-        ready_event.send(SpineReadyEvent(*entity));
+        ready_events.send(SpineReadyEvent(*entity));
     }
     local.ready = vec![];
     for (mut loader, entity, data_handle) in skeleton_query.iter_mut() {
@@ -190,13 +204,47 @@ fn spine_load(
     }
 }
 
-pub fn spine_update(mut spine_query: Query<&mut Spine>, time: Res<Time>) {
+#[derive(Default)]
+struct SpineUpdateLocal {
+    events: Arc<Mutex<VecDeque<SpineEvent>>>,
+}
+
+fn spine_update(
+    mut spine_query: Query<&mut Spine>,
+    mut spine_ready_events: EventReader<SpineReadyEvent>,
+    mut spine_events: EventWriter<SpineEvent>,
+    time: Res<Time>,
+    local: Local<SpineUpdateLocal>,
+) {
+    for event in spine_ready_events.iter() {
+        if let Ok(mut spine) = spine_query.get_mut(event.0) {
+            let events = local.events.clone();
+            spine.animation_state.set_listener(
+                move |_animation_state, event_type, _track_entry, spine_event| {
+                    if matches!(event_type, EventType::Event) {
+                        if let Some(spine_event) = spine_event {
+                            let mut events = events.lock().unwrap();
+                            events.push_back(SpineEvent {
+                                name: spine_event.data().name().to_owned(),
+                            });
+                        }
+                    }
+                },
+            );
+        }
+    }
+    {
+        let mut events = local.events.lock().unwrap();
+        while let Some(event) = events.pop_front() {
+            spine_events.send(event);
+        }
+    }
     for mut spine in spine_query.iter_mut() {
-        spine.0.update(time.delta_seconds());
+        spine.update(time.delta_seconds());
     }
 }
 
-pub fn spine_render(
+fn spine_render(
     mut spine_query: Query<(&mut Spine, &Children)>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut color_materials: ResMut<Assets<ColorMaterial>>,
@@ -214,8 +262,11 @@ pub fn spine_render(
                     for _ in 0..renderable.vertices.len() {
                         normals.push([0., 0., 0.]);
                     }
-                    mesh.set_indices(Some(Indices::U32(take(&mut renderable.indices))));
-                    mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, take(&mut renderable.vertices));
+                    mesh.set_indices(Some(Indices::U16(take(&mut renderable.indices))));
+                    mesh.insert_attribute(
+                        MeshVertexAttribute::new("Vertex_Position", 0, VertexFormat::Float32x2),
+                        take(&mut renderable.vertices),
+                    );
                     mesh.insert_attribute(Mesh::ATTRIBUTE_NORMAL, normals);
                     mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, take(&mut renderable.uvs));
                     if let Some(color_material) = color_materials.get_mut(color_material_handle) {

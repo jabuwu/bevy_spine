@@ -2536,9 +2536,9 @@ dependencies = [
 
 [[package]]
 name = "rusty_spine"
-version = "0.1.0"
+version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "df685895c5f9d6ab060ce117cc58108e8238b9d1e0711eebff45c111fe3ebe6b"
+checksum = "c4db9dd2143e0f9edc039928f96ad2b05d8c3de3e94e280564b169c05c7777de"
 
 [[package]]
 name = "ryu"
