@@ -42,9 +42,11 @@ impl Plugin for SpinePlugin {
         });
         app.add_asset::<Atlas>()
             .add_asset::<SkeletonJson>()
+            .add_asset::<SkeletonBinary>()
             .add_asset::<SkeletonData>()
             .init_asset_loader::<AtlasLoader>()
             .init_asset_loader::<SkeletonJsonLoader>()
+            .init_asset_loader::<SkeletonBinaryLoader>()
             .add_event::<SpineReadyEvent>()
             .add_event::<SpineEvent>()
             .add_system(spine_load.label(SpineSystem::Load))
@@ -126,6 +128,7 @@ fn spine_load(
     mut skeleton_data_assets: ResMut<Assets<SkeletonData>>,
     atlases: ResMut<Assets<Atlas>>,
     jsons: ResMut<Assets<SkeletonJson>>,
+    binaries: ResMut<Assets<SkeletonBinary>>,
 ) {
     for entity in local.ready.iter() {
         ready_events.send(SpineReadyEvent(*entity));
@@ -144,30 +147,85 @@ fn spine_load(
             } else {
                 continue;
             };
-            let json = if let Some(json) = jsons.get(&skeleton_data_asset.json) {
-                json
-            } else {
-                continue;
-            };
-            let skeleton_json = if let Some(skeleton_json) = &skeleton_data_asset.loader {
-                skeleton_json
-            } else {
-                skeleton_data_asset.loader =
-                    Some(rusty_spine::SkeletonJson::new(atlas.atlas.clone()));
-                &skeleton_data_asset.loader.as_ref().unwrap()
-            };
-            let skeleton_data = if let Some(skeleton_data) = &skeleton_data_asset.data {
-                skeleton_data.clone()
-            } else {
-                match skeleton_json.read_skeleton_data(&json.json) {
-                    Ok(skeleton_data) => {
-                        skeleton_data_asset.data = Some(Arc::new(skeleton_data));
-                        skeleton_data_asset.data.as_ref().unwrap().clone()
-                    }
-                    Err(_err) => {
-                        // TODO: print error?
-                        *loader = SpineLoader::Loading;
+            let skeleton_data = match &skeleton_data_asset.load_type {
+                SkeletonDataTypeHandle::Json(json) => {
+                    let json = if let Some(json) = jsons.get(&json) {
+                        json
+                    } else {
                         continue;
+                    };
+                    let skeleton_json = if let Some(loader) = &skeleton_data_asset.loader {
+                        if let SkeletonDataLoader::Json(skeleton_json) = &loader {
+                            skeleton_json
+                        } else {
+                            unreachable!()
+                        }
+                    } else {
+                        skeleton_data_asset.loader = Some(SkeletonDataLoader::Json(
+                            rusty_spine::SkeletonJson::new(atlas.atlas.clone()),
+                        ));
+                        if let SkeletonDataLoader::Json(skeleton_json) =
+                            &skeleton_data_asset.loader.as_ref().unwrap()
+                        {
+                            skeleton_json
+                        } else {
+                            unreachable!()
+                        }
+                    };
+                    if let Some(skeleton_data) = &skeleton_data_asset.data {
+                        skeleton_data.clone()
+                    } else {
+                        match skeleton_json.read_skeleton_data(&json.json) {
+                            Ok(skeleton_data) => {
+                                skeleton_data_asset.data = Some(Arc::new(skeleton_data));
+                                skeleton_data_asset.data.as_ref().unwrap().clone()
+                            }
+                            Err(_err) => {
+                                // TODO: print error?
+                                *loader = SpineLoader::Loading;
+                                continue;
+                            }
+                        }
+                    }
+                }
+                SkeletonDataTypeHandle::Binary(binary) => {
+                    let binary = if let Some(binary) = binaries.get(&binary) {
+                        binary
+                    } else {
+                        continue;
+                    };
+                    let skeleton_binary = if let Some(loader) = &skeleton_data_asset.loader {
+                        if let SkeletonDataLoader::Binary(skeleton_binary) = &loader {
+                            skeleton_binary
+                        } else {
+                            unreachable!()
+                        }
+                    } else {
+                        skeleton_data_asset.loader = Some(SkeletonDataLoader::Binary(
+                            rusty_spine::SkeletonBinary::new(atlas.atlas.clone()),
+                        ));
+                        if let SkeletonDataLoader::Binary(skeleton_binary) =
+                            &skeleton_data_asset.loader.as_ref().unwrap()
+                        {
+                            skeleton_binary
+                        } else {
+                            unreachable!()
+                        }
+                    };
+                    if let Some(skeleton_data) = &skeleton_data_asset.data {
+                        skeleton_data.clone()
+                    } else {
+                        match skeleton_binary.read_skeleton_data(&binary.binary) {
+                            Ok(skeleton_data) => {
+                                skeleton_data_asset.data = Some(Arc::new(skeleton_data));
+                                skeleton_data_asset.data.as_ref().unwrap().clone()
+                            }
+                            Err(_err) => {
+                                // TODO: print error?
+                                *loader = SpineLoader::Loading;
+                                continue;
+                            }
+                        }
                     }
                 }
             };
