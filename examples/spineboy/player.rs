@@ -9,8 +9,9 @@ use crate::bullet::{BulletSpawnEvent, BulletSystem};
 const PLAYER_TRACK_PORTAL: i32 = 0;
 const PLAYER_TRACK_IDLE: i32 = 0;
 const PLAYER_TRACK_RUN: i32 = 1;
-const PLAYER_TRACK_AIM: i32 = 2;
-const PLAYER_TRACK_SHOOT: i32 = 3;
+const PLAYER_TRACK_JUMP: i32 = 2;
+const PLAYER_TRACK_AIM: i32 = 3;
+const PLAYER_TRACK_SHOOT: i32 = 4;
 
 #[derive(Debug, Hash, PartialEq, Eq, Clone, SystemLabel)]
 pub enum PlayerSystem {
@@ -20,6 +21,7 @@ pub enum PlayerSystem {
     Aim,
     Shoot,
     Move,
+    Jump,
 }
 
 pub struct PlayerPlugin;
@@ -29,7 +31,12 @@ impl Plugin for PlayerPlugin {
         app.add_event::<PlayerSpawnEvent>()
             .add_system(player_spawn.label(PlayerSystem::Spawn))
             .add_system(player_spine_ready.label(PlayerSystem::SpineReady))
-            .add_system(player_spine_events.label(PlayerSystem::SpineEvents))
+            .add_system(
+                player_spine_events
+                    .label(PlayerSystem::SpineEvents)
+                    .after(SpineSystem::Update)
+                    .before(SpineSystem::SyncEntities),
+            )
             .add_system(
                 player_aim
                     .label(PlayerSystem::Aim)
@@ -45,7 +52,14 @@ impl Plugin for PlayerPlugin {
             .add_system(
                 player_move
                     .label(PlayerSystem::Move)
-                    .after(SpineSystem::Render),
+                    .after(SpineSystem::SyncBones)
+                    .before(SpineSystem::Render),
+            )
+            .add_system(
+                player_jump
+                    .label(PlayerSystem::Jump)
+                    .after(SpineSystem::SyncBones)
+                    .before(SpineSystem::Render),
             );
     }
 }
@@ -127,18 +141,28 @@ fn player_spine_events(
     for event in spine_events.iter() {
         match event {
             SpineEvent::Complete { entity, animation } => {
-                if animation == "portal" {
-                    if let Ok((mut spine, mut player)) = spine_query.get_mut(*entity) {
-                        let Spine(SkeletonController {
-                            animation_state, ..
-                        }) = spine.as_mut();
-                        let _ =
-                            animation_state.set_animation_by_name(PLAYER_TRACK_IDLE, "idle", true);
-                        let _ =
-                            animation_state.set_animation_by_name(PLAYER_TRACK_AIM, "aim", true);
-                        let _ =
-                            animation_state.set_animation_by_name(PLAYER_TRACK_RUN, "run", true);
+                if let Ok((mut spine, mut player)) = spine_query.get_mut(*entity) {
+                    let Spine(controller) = spine.as_mut();
+                    if animation == "portal" {
+                        let _ = controller.animation_state.set_animation_by_name(
+                            PLAYER_TRACK_IDLE,
+                            "idle",
+                            true,
+                        );
+                        let _ = controller.animation_state.set_animation_by_name(
+                            PLAYER_TRACK_AIM,
+                            "aim",
+                            true,
+                        );
+                        let _ = controller.animation_state.set_animation_by_name(
+                            PLAYER_TRACK_RUN,
+                            "run",
+                            true,
+                        );
                         player.spawned = true;
+                        controller.update(0.01);
+                    } else if animation == "jump" {
+                        controller.animation_state.clear_track(PLAYER_TRACK_JUMP);
                     }
                 }
             }
@@ -148,8 +172,9 @@ fn player_spine_events(
 }
 
 fn player_aim(
-    crosshair_query: Query<(&CrosshairController, &Player)>,
-    mut bone_query: Query<(&mut Transform, &Parent), With<SpineBone>>,
+    crosshair_query: Query<(Entity, &CrosshairController, &Player)>,
+    bone_query: Query<(Entity, &Parent), With<SpineBone>>,
+    mut transform_query: Query<&mut Transform>,
     global_transform_query: Query<&GlobalTransform>,
     windows: Res<Windows>,
     camera_query: Query<(Entity, &Camera)>,
@@ -175,11 +200,9 @@ fn player_aim(
     } else {
         Vec2::ZERO
     };
-    for (crosshair, player) in crosshair_query.iter() {
+    for (player_entity, crosshair, player) in crosshair_query.iter() {
         if player.spawned {
-            if let Ok((mut crosshair_transform, crosshair_parent)) =
-                bone_query.get_mut(crosshair.bone)
-            {
+            if let Ok((crosshair_entity, crosshair_parent)) = bone_query.get(crosshair.bone) {
                 let matrix = if let Ok(parent_transform) =
                     global_transform_query.get(crosshair_parent.get())
                 {
@@ -187,8 +210,17 @@ fn player_aim(
                 } else {
                     Mat4::IDENTITY
                 };
-                crosshair_transform.translation =
-                    (matrix * cursor_position.extend(0.).extend(1.)).truncate();
+                let mut scale_x = 1.;
+                if let Ok(mut crosshair_transform) = transform_query.get_mut(crosshair_entity) {
+                    crosshair_transform.translation =
+                        (matrix * cursor_position.extend(0.).extend(1.)).truncate();
+                    if crosshair_transform.translation.x < 0. {
+                        scale_x = -1.;
+                    }
+                }
+                if let Ok(mut player_transform) = transform_query.get_mut(player_entity) {
+                    player_transform.scale.x = (scale_x * player_transform.scale.x).signum() * 0.25;
+                }
             }
         }
     }
@@ -248,11 +280,6 @@ fn player_move(
             if movement == 0. {
                 player.movement_velocity *= 0.0001_f32.powf(time.delta_seconds());
             }
-            if movement > 0. {
-                player_transform.scale.x = 0.25;
-            } else if movement < 0. {
-                player_transform.scale.x = -0.25;
-            }
             player_transform.translation.x +=
                 player.movement_velocity * time.delta_seconds() * 500.;
             player_transform.translation.x = player_transform.translation.x.clamp(-500., 500.);
@@ -262,6 +289,29 @@ fn player_move(
             {
                 track.set_alpha(player.movement_velocity.abs());
             }
+        }
+    }
+}
+
+fn player_jump(mut player_query: Query<&mut Spine, With<Player>>, keys: Res<Input<KeyCode>>) {
+    for mut spine in player_query.iter_mut() {
+        let Spine(SkeletonController {
+            animation_state, ..
+        }) = spine.as_mut();
+        if let Some(mut jump_track) = animation_state.track_at_index_mut(PLAYER_TRACK_JUMP as usize)
+        {
+            let progress = (jump_track.track_time()
+                / unsafe { (*jump_track.animation().c_ptr()).duration })
+            .clamp(0., 1.);
+            let mix_out_threshold = 0.9;
+            if progress > mix_out_threshold {
+                jump_track
+                    .set_alpha(1. - (progress - mix_out_threshold) / (1. - mix_out_threshold));
+            } else {
+                jump_track.set_alpha(1.);
+            }
+        } else if keys.just_pressed(KeyCode::Space) {
+            let _ = animation_state.set_animation_by_name(PLAYER_TRACK_JUMP, "jump", false);
         }
     }
 }
