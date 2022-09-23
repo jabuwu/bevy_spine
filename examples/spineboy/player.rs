@@ -3,6 +3,7 @@ use bevy_spine::{
     SkeletonController, SkeletonData, Spine, SpineBone, SpineBundle, SpineEvent, SpineReadyEvent,
     SpineSystem,
 };
+use lerp::Lerp;
 
 use crate::bullet::{BulletSpawnEvent, BulletSystem};
 
@@ -34,7 +35,6 @@ impl Plugin for PlayerPlugin {
             .add_system(
                 player_spine_events
                     .label(PlayerSystem::SpineEvents)
-                    .after(SpineSystem::Update)
                     .before(SpineSystem::SyncEntities),
             )
             .add_system(
@@ -52,14 +52,12 @@ impl Plugin for PlayerPlugin {
             .add_system(
                 player_move
                     .label(PlayerSystem::Move)
-                    .after(SpineSystem::SyncBones)
-                    .before(SpineSystem::Render),
+                    .before(SpineSystem::Update),
             )
             .add_system(
                 player_jump
                     .label(PlayerSystem::Jump)
-                    .after(SpineSystem::SyncBones)
-                    .before(SpineSystem::Render),
+                    .before(SpineSystem::Update),
             );
     }
 }
@@ -91,7 +89,7 @@ fn player_spawn(mut commands: Commands, mut player_spawn_events: EventReader<Pla
         commands
             .spawn_bundle(SpineBundle {
                 skeleton: event.skeleton.clone(),
-                transform: Transform::from_xyz(0., -200., 0.).with_scale(Vec3::ONE * 0.25),
+                transform: Transform::from_xyz(-300., -200., 0.).with_scale(Vec3::ONE * 0.25),
                 ..Default::default()
             })
             .insert(Player {
@@ -159,8 +157,17 @@ fn player_spine_events(
                             "run",
                             true,
                         );
+                        controller
+                            .animation_state
+                            .track_at_index_mut(PLAYER_TRACK_AIM as usize)
+                            .unwrap()
+                            .set_alpha(0.);
+                        controller
+                            .animation_state
+                            .track_at_index_mut(PLAYER_TRACK_RUN as usize)
+                            .unwrap()
+                            .set_alpha(0.);
                         player.spawned = true;
-                        controller.update(0.01);
                     } else if animation == "jump" {
                         controller.animation_state.clear_track(PLAYER_TRACK_JUMP);
                     }
@@ -172,12 +179,13 @@ fn player_spine_events(
 }
 
 fn player_aim(
-    crosshair_query: Query<(Entity, &CrosshairController, &Player)>,
+    mut crosshair_query: Query<(&mut Spine, Entity, &CrosshairController, &Player)>,
     bone_query: Query<(Entity, &Parent), With<SpineBone>>,
     mut transform_query: Query<&mut Transform>,
     global_transform_query: Query<&GlobalTransform>,
     windows: Res<Windows>,
     camera_query: Query<(Entity, &Camera)>,
+    time: Res<Time>,
 ) {
     let cursor_position = if let Some(cursor_position) = windows.primary().cursor_position() {
         if let Ok((camera_entity, camera)) = camera_query.get_single() {
@@ -200,7 +208,7 @@ fn player_aim(
     } else {
         Vec2::ZERO
     };
-    for (player_entity, crosshair, player) in crosshair_query.iter() {
+    for (mut spine, player_entity, crosshair, player) in crosshair_query.iter_mut() {
         if player.spawned {
             if let Ok((crosshair_entity, crosshair_parent)) = bone_query.get(crosshair.bone) {
                 let matrix = if let Ok(parent_transform) =
@@ -220,6 +228,13 @@ fn player_aim(
                 }
                 if let Ok(mut player_transform) = transform_query.get_mut(player_entity) {
                     player_transform.scale.x = (scale_x * player_transform.scale.x).signum() * 0.25;
+                }
+                if let Some(mut aim_track) = spine
+                    .animation_state
+                    .track_at_index_mut(PLAYER_TRACK_AIM as usize)
+                {
+                    let alpha = aim_track.alpha() * 2.5;
+                    aim_track.set_alpha(alpha.lerp(1., time.delta_seconds()).clamp(0., 1.));
                 }
             }
         }
@@ -304,14 +319,21 @@ fn player_jump(mut player_query: Query<&mut Spine, With<Player>>, keys: Res<Inpu
                 / unsafe { (*jump_track.animation().c_ptr()).duration })
             .clamp(0., 1.);
             let mix_out_threshold = 0.9;
+            let mix_in_threshold = 0.05;
             if progress > mix_out_threshold {
                 jump_track
                     .set_alpha(1. - (progress - mix_out_threshold) / (1. - mix_out_threshold));
+            } else if progress < mix_in_threshold {
+                jump_track.set_alpha((progress / mix_in_threshold).clamp(0., 1.));
             } else {
                 jump_track.set_alpha(1.);
             }
         } else if keys.just_pressed(KeyCode::Space) {
             let _ = animation_state.set_animation_by_name(PLAYER_TRACK_JUMP, "jump", false);
+            animation_state
+                .track_at_index_mut(PLAYER_TRACK_JUMP as usize)
+                .unwrap()
+                .set_alpha(0.);
         }
     }
 }

@@ -10,3 +10,4 @@ bevy = "0.8"
 [dev-dependencies]
 bevy_egui = "0.16"
 rfd = "0.10"
+lerp = "0.4"

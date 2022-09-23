@@ -382,14 +382,14 @@ fn spine_update(
             );
         }
     }
+    for (_, mut spine) in spine_query.iter_mut() {
+        spine.update(time.delta_seconds());
+    }
     {
         let mut events = local.events.lock().unwrap();
         while let Some(event) = events.pop_front() {
             spine_events.send(event);
         }
-    }
-    for (_, mut spine) in spine_query.iter_mut() {
-        spine.update(time.delta_seconds());
     }
 }
 
