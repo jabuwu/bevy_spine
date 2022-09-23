@@ -6,9 +6,7 @@ A Bevy Plugin for Spine, utilizing [rusty_spine](https://github.com/jabuwu/rusty
 
 All Spine features (IK, Paths, Clipping, etc) work. Some models might depend on backface culling being disabled or blend modes. but the default 2D Bevy renderer does not support these (as far as I know). Because of this, a custom renderer may need to be used.
 
-The rusty_spine API still needs a lot of work. Simple things like Bone manipulation works fine, but working directly with attachments and track entries is not possible without falling back on the C API.
-
-The skeleton should probably sync with the Bevy entity hierarchy, that way it's possible to interact directly with Bevy APIs rather than having to work entirely through the Skeleton API.
+The rusty_spine API still needs some work. Attachments and timelines in particular cannot be manipulated without relying on the C API directly.
 
 ## License
 
