@@ -4,7 +4,6 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use assets::{AtlasLoader, SkeletonJsonLoader};
 use bevy::{
     prelude::*,
     render::{
@@ -13,8 +12,14 @@ use bevy::{
     },
     sprite::Mesh2dHandle,
 };
-use rusty::EventType;
-use rusty_spine::{draw::CullDirection, AnimationStateData, SkeletonControllerSettings};
+use rusty::Skeleton;
+
+use crate::{
+    assets::{AtlasLoader, SkeletonJsonLoader},
+    rusty::{
+        draw::CullDirection, AnimationStateData, BoneHandle, EventType, SkeletonControllerSettings,
+    },
+};
 
 pub use assets::*;
 pub use rusty_spine as rusty;
@@ -27,6 +32,8 @@ pub struct SpineTexture(pub String);
 pub enum SpineSystem {
     Load,
     Update,
+    SyncEntities,
+    SyncBones,
     Render,
 }
 
@@ -56,15 +63,34 @@ impl Plugin for SpinePlugin {
                     .after(SpineSystem::Load),
             )
             .add_system(
+                spine_sync_entities
+                    .label(SpineSystem::SyncEntities)
+                    .after(SpineSystem::Update),
+            )
+            .add_system(
+                spine_sync_bones
+                    .label(SpineSystem::SyncBones)
+                    .after(SpineSystem::SyncEntities),
+            )
+            .add_system(
                 spine_render
                     .label(SpineSystem::Render)
-                    .after(SpineSystem::Update),
+                    .after(SpineSystem::SyncBones),
             );
     }
 }
 
 #[derive(Component)]
 pub struct Spine(pub SkeletonController);
+
+#[derive(Component)]
+pub struct SpineBone {
+    pub spine_entity: Entity,
+    pub handle: BoneHandle,
+}
+
+#[derive(Component)]
+pub struct SpineMesh;
 
 impl core::ops::Deref for Spine {
     type Target = SkeletonController;
@@ -108,8 +134,13 @@ pub struct SpineBundle {
 pub struct SpineReadyEvent(pub Entity);
 
 #[derive(Clone)]
-pub struct SpineEvent {
-    pub name: String,
+pub enum SpineEvent {
+    Start { entity: Entity, animation: String },
+    Interrupt { entity: Entity, animation: String },
+    End { entity: Entity, animation: String },
+    Complete { entity: Entity, animation: String },
+    Dispose { entity: Entity },
+    Event { entity: Entity, name: String },
 }
 
 #[derive(Default)]
@@ -134,95 +165,86 @@ fn spine_load(
         ready_events.send(SpineReadyEvent(*entity));
     }
     local.ready = vec![];
-    for (mut loader, entity, data_handle) in skeleton_query.iter_mut() {
-        if matches!(loader.as_ref(), SpineLoader::Loading) {
-            let skeleton_data_asset =
+    for (mut spine_loader, entity, data_handle) in skeleton_query.iter_mut() {
+        if matches!(spine_loader.as_ref(), SpineLoader::Loading) {
+            let mut skeleton_data_asset =
                 if let Some(skeleton_data_asset) = skeleton_data_assets.get_mut(data_handle) {
                     skeleton_data_asset
                 } else {
                     continue;
                 };
-            let atlas = if let Some(atlas) = atlases.get(&skeleton_data_asset.atlas) {
-                atlas
-            } else {
-                continue;
-            };
-            let skeleton_data = match &skeleton_data_asset.load_type {
-                SkeletonDataTypeHandle::Json(json) => {
+            let skeleton_data = match &mut skeleton_data_asset {
+                SkeletonData::JsonFile {
+                    atlas,
+                    json,
+                    loader,
+                    data,
+                } => {
+                    let atlas = if let Some(atlas) = atlases.get(atlas) {
+                        atlas
+                    } else {
+                        continue;
+                    };
                     let json = if let Some(json) = jsons.get(&json) {
                         json
                     } else {
                         continue;
                     };
-                    let skeleton_json = if let Some(loader) = &skeleton_data_asset.loader {
-                        if let SkeletonDataLoader::Json(skeleton_json) = &loader {
-                            skeleton_json
-                        } else {
-                            unreachable!()
-                        }
+                    let skeleton_json = if let Some(loader) = &loader {
+                        loader
                     } else {
-                        skeleton_data_asset.loader = Some(SkeletonDataLoader::Json(
-                            rusty_spine::SkeletonJson::new(atlas.atlas.clone()),
-                        ));
-                        if let SkeletonDataLoader::Json(skeleton_json) =
-                            &skeleton_data_asset.loader.as_ref().unwrap()
-                        {
-                            skeleton_json
-                        } else {
-                            unreachable!()
-                        }
+                        *loader = Some(rusty_spine::SkeletonJson::new(atlas.atlas.clone()));
+                        loader.as_ref().unwrap()
                     };
-                    if let Some(skeleton_data) = &skeleton_data_asset.data {
+                    if let Some(skeleton_data) = &data {
                         skeleton_data.clone()
                     } else {
                         match skeleton_json.read_skeleton_data(&json.json) {
                             Ok(skeleton_data) => {
-                                skeleton_data_asset.data = Some(Arc::new(skeleton_data));
-                                skeleton_data_asset.data.as_ref().unwrap().clone()
+                                *data = Some(Arc::new(skeleton_data));
+                                data.as_ref().unwrap().clone()
                             }
                             Err(_err) => {
                                 // TODO: print error?
-                                *loader = SpineLoader::Loading;
+                                *spine_loader = SpineLoader::Loading;
                                 continue;
                             }
                         }
                     }
                 }
-                SkeletonDataTypeHandle::Binary(binary) => {
+                SkeletonData::BinaryFile {
+                    atlas,
+                    binary,
+                    loader,
+                    data,
+                } => {
+                    let atlas = if let Some(atlas) = atlases.get(atlas) {
+                        atlas
+                    } else {
+                        continue;
+                    };
                     let binary = if let Some(binary) = binaries.get(&binary) {
                         binary
                     } else {
                         continue;
                     };
-                    let skeleton_binary = if let Some(loader) = &skeleton_data_asset.loader {
-                        if let SkeletonDataLoader::Binary(skeleton_binary) = &loader {
-                            skeleton_binary
-                        } else {
-                            unreachable!()
-                        }
+                    let skeleton_binary = if let Some(loader) = &loader {
+                        loader
                     } else {
-                        skeleton_data_asset.loader = Some(SkeletonDataLoader::Binary(
-                            rusty_spine::SkeletonBinary::new(atlas.atlas.clone()),
-                        ));
-                        if let SkeletonDataLoader::Binary(skeleton_binary) =
-                            &skeleton_data_asset.loader.as_ref().unwrap()
-                        {
-                            skeleton_binary
-                        } else {
-                            unreachable!()
-                        }
+                        *loader = Some(rusty_spine::SkeletonBinary::new(atlas.atlas.clone()));
+                        loader.as_ref().unwrap()
                     };
-                    if let Some(skeleton_data) = &skeleton_data_asset.data {
+                    if let Some(skeleton_data) = &data {
                         skeleton_data.clone()
                     } else {
                         match skeleton_binary.read_skeleton_data(&binary.binary) {
                             Ok(skeleton_data) => {
-                                skeleton_data_asset.data = Some(Arc::new(skeleton_data));
-                                skeleton_data_asset.data.as_ref().unwrap().clone()
+                                *data = Some(Arc::new(skeleton_data));
+                                data.as_ref().unwrap().clone()
                             }
                             Err(_err) => {
                                 // TODO: print error?
-                                *loader = SpineLoader::Loading;
+                                *spine_loader = SpineLoader::Loading;
                                 continue;
                             }
                         }
@@ -238,7 +260,7 @@ fn spine_load(
             commands
                 .entity(entity)
                 .with_children(|parent| {
-                    for _ in 0..controller.skeleton.slots_count() {
+                    for _ in controller.skeleton.slots() {
                         let mut mesh = Mesh::new(PrimitiveTopology::TriangleList);
                         empty_mesh(&mut mesh);
                         let mesh_handle = meshes.add(mesh);
@@ -254,11 +276,46 @@ fn spine_load(
                             }),
                         ));
                     }
+                    spawn_bones(
+                        entity,
+                        parent,
+                        &controller.skeleton,
+                        controller.skeleton.bone_root().handle(),
+                    );
                 })
                 .insert(Spine(controller));
-            *loader = SpineLoader::Ready;
+            *spine_loader = SpineLoader::Ready;
             local.ready.push(entity);
         }
+    }
+}
+
+fn spawn_bones(
+    spine_entity: Entity,
+    parent: &mut ChildBuilder,
+    skeleton: &Skeleton,
+    bone: BoneHandle,
+) {
+    if let Some(bone) = bone.get(skeleton) {
+        parent
+            .spawn_bundle(SpriteBundle {
+                sprite: Sprite {
+                    custom_size: Some(Vec2::new(8., 32.)),
+                    color: Color::NONE,
+                    ..Default::default()
+                },
+                transform: Transform::from_xyz(0., 0., 1.),
+                ..Default::default()
+            })
+            .insert(SpineBone {
+                spine_entity,
+                handle: bone.handle(),
+            })
+            .with_children(|parent| {
+                for child in bone.children() {
+                    spawn_bones(spine_entity, parent, skeleton, child.handle());
+                }
+            });
     }
 }
 
@@ -268,25 +325,59 @@ struct SpineUpdateLocal {
 }
 
 fn spine_update(
-    mut spine_query: Query<&mut Spine>,
+    mut spine_query: Query<(Entity, &mut Spine)>,
     mut spine_ready_events: EventReader<SpineReadyEvent>,
     mut spine_events: EventWriter<SpineEvent>,
     time: Res<Time>,
     local: Local<SpineUpdateLocal>,
 ) {
     for event in spine_ready_events.iter() {
-        if let Ok(mut spine) = spine_query.get_mut(event.0) {
+        if let Ok((entity, mut spine)) = spine_query.get_mut(event.0) {
             let events = local.events.clone();
             spine.animation_state.set_listener(
-                move |_animation_state, event_type, _track_entry, spine_event| {
-                    if matches!(event_type, EventType::Event) {
+                move |_animation_state, event_type, track_entry, spine_event| match event_type {
+                    EventType::Start => {
+                        let mut events = events.lock().unwrap();
+                        events.push_back(SpineEvent::Start {
+                            entity,
+                            animation: track_entry.animation().name().to_owned(),
+                        });
+                    }
+                    EventType::Interrupt => {
+                        let mut events = events.lock().unwrap();
+                        events.push_back(SpineEvent::Interrupt {
+                            entity,
+                            animation: track_entry.animation().name().to_owned(),
+                        });
+                    }
+                    EventType::End => {
+                        let mut events = events.lock().unwrap();
+                        events.push_back(SpineEvent::End {
+                            entity,
+                            animation: track_entry.animation().name().to_owned(),
+                        });
+                    }
+                    EventType::Complete => {
+                        let mut events = events.lock().unwrap();
+                        events.push_back(SpineEvent::Complete {
+                            entity,
+                            animation: track_entry.animation().name().to_owned(),
+                        });
+                    }
+                    EventType::Dispose => {
+                        let mut events = events.lock().unwrap();
+                        events.push_back(SpineEvent::Dispose { entity });
+                    }
+                    EventType::Event => {
                         if let Some(spine_event) = spine_event {
                             let mut events = events.lock().unwrap();
-                            events.push_back(SpineEvent {
+                            events.push_back(SpineEvent::Event {
+                                entity,
                                 name: spine_event.data().name().to_owned(),
                             });
                         }
                     }
+                    _ => {}
                 },
             );
         }
@@ -297,20 +388,81 @@ fn spine_update(
             spine_events.send(event);
         }
     }
-    for mut spine in spine_query.iter_mut() {
+    for (_, mut spine) in spine_query.iter_mut() {
         spine.update(time.delta_seconds());
     }
 }
 
+fn spine_sync_entities(
+    mut bone_query: Query<(&mut Transform, &SpineBone)>,
+    spine_query: Query<&Spine>,
+) {
+    for (mut bone_transform, bone) in bone_query.iter_mut() {
+        if let Ok(spine) = spine_query.get(bone.spine_entity) {
+            if let Some(bone) = bone.handle.get(&spine.skeleton) {
+                bone_transform.translation.x = bone.x();
+                bone_transform.translation.y = bone.y();
+                bone_transform.rotation =
+                    Quat::from_axis_angle(Vec3::Z, bone.rotation().to_radians());
+                bone_transform.scale.x = bone.scale_x();
+                bone_transform.scale.y = bone.scale_y();
+            }
+        }
+    }
+}
+
+fn spine_sync_bones(
+    mut bone_query: Query<(&mut Transform, &SpineBone)>,
+    mut spine_query: Query<&mut Spine>,
+) {
+    for (bone_transform, bone) in bone_query.iter_mut() {
+        if let Ok(mut spine) = spine_query.get_mut(bone.spine_entity) {
+            if let Some(mut bone) = bone.handle.get_mut(&mut spine.skeleton) {
+                bone.set_x(bone_transform.translation.x);
+                bone.set_y(bone_transform.translation.y);
+                let ang = bone_transform.rotation * Vec3::X;
+                bone.set_rotation(ang.y.atan2(ang.x).to_degrees());
+                bone.set_scale_x(bone_transform.scale.x);
+                bone.set_scale_y(bone_transform.scale.y);
+            }
+        }
+    }
+    for mut spine in spine_query.iter_mut() {
+        spine.0.skeleton.update_world_transform();
+    }
+    for (mut bone_transform, bone) in bone_query.iter_mut() {
+        if let Ok(spine) = spine_query.get(bone.spine_entity) {
+            if let Some(bone) = bone.handle.get(&spine.skeleton) {
+                bone_transform.translation.x = bone.applied_x();
+                bone_transform.translation.y = bone.applied_y();
+                bone_transform.rotation =
+                    Quat::from_axis_angle(Vec3::Z, bone.applied_rotation().to_radians());
+                bone_transform.scale.x = bone.applied_scale_x();
+                bone_transform.scale.y = bone.applied_scale_y();
+            }
+        }
+    }
+}
+
 fn spine_render(
-    mut spine_query: Query<(&mut Spine, &Children)>,
+    mut spine_query: Query<(&mut Spine, &Children, &Transform)>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut color_materials: ResMut<Assets<ColorMaterial>>,
     colored_mesh2d: Query<(&Mesh2dHandle, &Handle<ColorMaterial>)>,
     asset_server: Res<AssetServer>,
 ) {
-    for (mut spine, spine_children) in spine_query.iter_mut() {
-        spine.0.skeleton.update_world_transform();
+    for (mut spine, spine_children, spine_transform) in spine_query.iter_mut() {
+        spine.0.settings.cull_direction = CullDirection::CounterClockwise;
+        if spine_transform.scale.x < 0. {
+            if spine_transform.scale.y > 0. {
+                spine.0.settings.cull_direction = CullDirection::Clockwise;
+            }
+        }
+        if spine_transform.scale.y < 0. {
+            if spine_transform.scale.y > 0. {
+                spine.0.settings.cull_direction = CullDirection::Clockwise;
+            }
+        }
         let mut renderables = spine.0.renderables();
         for (renderable_index, child) in spine_children.iter().enumerate() {
             if let Ok((mesh_handle, color_material_handle)) = colored_mesh2d.get(*child) {

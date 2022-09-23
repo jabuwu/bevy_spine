@@ -104,38 +104,35 @@ impl AssetLoader for SkeletonBinaryLoader {
 
 #[derive(Debug, TypeUuid)]
 #[uuid = "7796a37b-37a4-49ea-bf4e-fb7344aa6015"]
-pub struct SkeletonData {
-    pub load_type: SkeletonDataTypeHandle,
-    pub atlas: Handle<Atlas>,
-    pub loader: Option<SkeletonDataLoader>,
-    pub data: Option<Arc<rusty_spine::SkeletonData>>,
-}
-
-#[derive(Debug)]
-pub enum SkeletonDataTypeHandle {
-    Json(Handle<SkeletonJson>),
-    Binary(Handle<SkeletonBinary>),
-}
-
-#[derive(Debug)]
-pub enum SkeletonDataLoader {
-    Json(rusty_spine::SkeletonJson),
-    Binary(rusty_spine::SkeletonBinary),
+pub enum SkeletonData {
+    BinaryFile {
+        atlas: Handle<Atlas>,
+        binary: Handle<SkeletonBinary>,
+        loader: Option<rusty_spine::SkeletonBinary>,
+        data: Option<Arc<rusty_spine::SkeletonData>>,
+    },
+    JsonFile {
+        atlas: Handle<Atlas>,
+        json: Handle<SkeletonJson>,
+        loader: Option<rusty_spine::SkeletonJson>,
+        data: Option<Arc<rusty_spine::SkeletonData>>,
+    },
 }
 
 impl SkeletonData {
     pub fn new_from_json(json: Handle<SkeletonJson>, atlas: Handle<Atlas>) -> Self {
-        Self {
-            load_type: SkeletonDataTypeHandle::Json(json),
+        Self::JsonFile {
             atlas,
+            json,
             loader: None,
             data: None,
         }
     }
+
     pub fn new_from_binary(binary: Handle<SkeletonBinary>, atlas: Handle<Atlas>) -> Self {
-        Self {
-            load_type: SkeletonDataTypeHandle::Binary(binary),
+        Self::BinaryFile {
             atlas,
+            binary,
             loader: None,
             data: None,
         }

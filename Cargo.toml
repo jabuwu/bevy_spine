@@ -4,5 +4,9 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-rusty_spine = "0.1.1"
+rusty_spine = "0.1.2"
 bevy = "0.8"
+
+[dev-dependencies]
+bevy_egui = "0.16"
+rfd = "0.10"

@@ -55,24 +55,26 @@ fn on_spine_event(
     asset_server: Res<AssetServer>,
 ) {
     for event in spine_events.iter() {
-        commands
-            .spawn_bundle(Text2dBundle {
-                text: Text::from_section(
-                    event.name.as_str(),
-                    TextStyle {
-                        font: asset_server.load("FiraMono-Medium.ttf"),
-                        font_size: 22.0,
-                        color: Color::WHITE,
-                    },
-                )
-                .with_alignment(TextAlignment {
-                    horizontal: HorizontalAlign::Center,
-                    vertical: VerticalAlign::Center,
-                }),
-                transform: Transform::from_xyz(0., -200., 1.),
-                ..Default::default()
-            })
-            .insert(Footstep);
+        if let SpineEvent::Event { name, .. } = event {
+            commands
+                .spawn_bundle(Text2dBundle {
+                    text: Text::from_section(
+                        name.as_str(),
+                        TextStyle {
+                            font: asset_server.load("FiraMono-Medium.ttf"),
+                            font_size: 22.0,
+                            color: Color::WHITE,
+                        },
+                    )
+                    .with_alignment(TextAlignment {
+                        horizontal: HorizontalAlign::Center,
+                        vertical: VerticalAlign::Center,
+                    }),
+                    transform: Transform::from_xyz(0., -200., 1.),
+                    ..Default::default()
+                })
+                .insert(Footstep);
+        }
     }
 }
 
