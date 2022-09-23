@@ -41,42 +41,60 @@ pub struct SpinePlugin;
 
 impl Plugin for SpinePlugin {
     fn build(&self, app: &mut App) {
-        rusty_spine::extension::set_create_texture_cb(|page, path| {
+        let image_handles: Arc<Mutex<Vec<(String, Handle<Image>)>>> =
+            Arc::new(Mutex::new(Vec::new()));
+        let image_remember: Arc<Mutex<Vec<String>>> = Arc::new(Mutex::new(Vec::new()));
+        let image_forget: Arc<Mutex<Vec<String>>> = Arc::new(Mutex::new(Vec::new()));
+        let remember = image_remember.clone();
+        rusty_spine::extension::set_create_texture_cb(move |page, path| {
+            remember.lock().unwrap().push(path.to_owned());
             page.renderer_object().set(SpineTexture(path.to_owned()));
         });
-        rusty_spine::extension::set_dispose_texture_cb(|page| unsafe {
+        let forget = image_forget.clone();
+        rusty_spine::extension::set_dispose_texture_cb(move |page| unsafe {
+            forget.lock().unwrap().push(
+                page.renderer_object()
+                    .get_unchecked::<SpineTexture>()
+                    .0
+                    .clone(),
+            );
             page.renderer_object().dispose::<SpineTexture>();
         });
-        app.add_asset::<Atlas>()
-            .add_asset::<SkeletonJson>()
-            .add_asset::<SkeletonBinary>()
-            .add_asset::<SkeletonData>()
-            .init_asset_loader::<AtlasLoader>()
-            .init_asset_loader::<SkeletonJsonLoader>()
-            .init_asset_loader::<SkeletonBinaryLoader>()
-            .add_event::<SpineReadyEvent>()
-            .add_event::<SpineEvent>()
-            .add_system(spine_load.label(SpineSystem::Load))
-            .add_system(
-                spine_update
-                    .label(SpineSystem::Update)
-                    .after(SpineSystem::Load),
-            )
-            .add_system(
-                spine_sync_entities
-                    .label(SpineSystem::SyncEntities)
-                    .after(SpineSystem::Update),
-            )
-            .add_system(
-                spine_sync_bones
-                    .label(SpineSystem::SyncBones)
-                    .after(SpineSystem::SyncEntities),
-            )
-            .add_system(
-                spine_render
-                    .label(SpineSystem::Render)
-                    .after(SpineSystem::SyncBones),
-            );
+        app.insert_resource(PersistentImageHandles {
+            handles: image_handles,
+            remember: image_remember,
+            forget: image_forget,
+        })
+        .add_asset::<Atlas>()
+        .add_asset::<SkeletonJson>()
+        .add_asset::<SkeletonBinary>()
+        .add_asset::<SkeletonData>()
+        .init_asset_loader::<AtlasLoader>()
+        .init_asset_loader::<SkeletonJsonLoader>()
+        .init_asset_loader::<SkeletonBinaryLoader>()
+        .add_event::<SpineReadyEvent>()
+        .add_event::<SpineEvent>()
+        .add_system(spine_load.label(SpineSystem::Load))
+        .add_system(
+            spine_update
+                .label(SpineSystem::Update)
+                .after(SpineSystem::Load),
+        )
+        .add_system(
+            spine_sync_entities
+                .label(SpineSystem::SyncEntities)
+                .after(SpineSystem::Update),
+        )
+        .add_system(
+            spine_sync_bones
+                .label(SpineSystem::SyncBones)
+                .after(SpineSystem::SyncEntities),
+        )
+        .add_system(
+            spine_render
+                .label(SpineSystem::Render)
+                .after(SpineSystem::SyncBones),
+        );
     }
 }
 
@@ -149,6 +167,12 @@ struct SpineLoadLocal {
     ready: Vec<Entity>,
 }
 
+struct PersistentImageHandles {
+    handles: Arc<Mutex<Vec<(String, Handle<Image>)>>>,
+    remember: Arc<Mutex<Vec<String>>>,
+    forget: Arc<Mutex<Vec<String>>>,
+}
+
 fn spine_load(
     mut skeleton_query: Query<(&mut SpineLoader, Entity, &Handle<SkeletonData>)>,
     mut commands: Commands,
@@ -160,6 +184,8 @@ fn spine_load(
     atlases: ResMut<Assets<Atlas>>,
     jsons: ResMut<Assets<SkeletonJson>>,
     binaries: ResMut<Assets<SkeletonBinary>>,
+    persistent_image_handles: Res<PersistentImageHandles>,
+    asset_server: Res<AssetServer>,
 ) {
     for entity in local.ready.iter() {
         ready_events.send(SpineReadyEvent(*entity));
@@ -286,6 +312,17 @@ fn spine_load(
                 .insert(Spine(controller));
             *spine_loader = SpineLoader::Ready;
             local.ready.push(entity);
+        }
+    }
+    let mut image_handles = persistent_image_handles.handles.lock().unwrap();
+    let mut image_remember = persistent_image_handles.remember.lock().unwrap();
+    let mut image_forget = persistent_image_handles.forget.lock().unwrap();
+    while let Some(image) = image_remember.pop() {
+        image_handles.push((image.clone(), asset_server.load(&image)));
+    }
+    while let Some(image) = image_forget.pop() {
+        if let Some(index) = image_handles.iter().position(|i| i.0 == image) {
+            image_handles.remove(index);
         }
     }
 }
