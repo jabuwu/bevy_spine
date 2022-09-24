@@ -308,8 +308,11 @@ fn player_move(
     }
 }
 
-fn player_jump(mut player_query: Query<&mut Spine, With<Player>>, keys: Res<Input<KeyCode>>) {
-    for mut spine in player_query.iter_mut() {
+fn player_jump(mut player_query: Query<(&mut Spine, &Player)>, keys: Res<Input<KeyCode>>) {
+    for (mut spine, player) in player_query.iter_mut() {
+        if !player.spawned {
+            continue;
+        }
         let Spine(SkeletonController {
             animation_state, ..
         }) = spine.as_mut();
