@@ -34,6 +34,7 @@ pub enum SpineSystem {
     Update,
     SyncEntities,
     SyncBones,
+    SyncEntitiesApplied,
     Render,
 }
 
@@ -91,9 +92,14 @@ impl Plugin for SpinePlugin {
                 .after(SpineSystem::SyncEntities),
         )
         .add_system(
+            spine_sync_entities_applied
+                .label(SpineSystem::SyncEntitiesApplied)
+                .after(SpineSystem::SyncBones),
+        )
+        .add_system(
             spine_render
                 .label(SpineSystem::Render)
-                .after(SpineSystem::SyncBones),
+                .after(SpineSystem::SyncEntitiesApplied),
         );
     }
 }
@@ -430,7 +436,7 @@ fn spine_update(
     }
 }
 
-fn spine_sync_entities(
+pub fn spine_sync_entities(
     mut bone_query: Query<(&mut Transform, &SpineBone)>,
     spine_query: Query<&Spine>,
 ) {
@@ -448,7 +454,7 @@ fn spine_sync_entities(
     }
 }
 
-fn spine_sync_bones(
+pub fn spine_sync_bones(
     mut bone_query: Query<(&mut Transform, &SpineBone)>,
     mut spine_query: Query<&mut Spine>,
 ) {
@@ -467,6 +473,12 @@ fn spine_sync_bones(
     for mut spine in spine_query.iter_mut() {
         spine.0.skeleton.update_world_transform();
     }
+}
+
+pub fn spine_sync_entities_applied(
+    mut bone_query: Query<(&mut Transform, &SpineBone)>,
+    spine_query: Query<&Spine>,
+) {
     for (mut bone_transform, bone) in bone_query.iter_mut() {
         if let Ok(spine) = spine_query.get(bone.spine_entity) {
             if let Some(bone) = bone.handle.get(&spine.skeleton) {
