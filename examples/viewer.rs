@@ -84,11 +84,19 @@ fn ui(
                     for entity in spine_entity_query.iter() {
                         commands.entity(entity).despawn_recursive();
                     }
-                    let skeleton = SkeletonData::new_from_json(
-                        asset_server.load(skeleton_file),
-                        asset_server.load(atlas_file),
-                    );
-                    let skeleton_handle = skeletons.add(skeleton);
+                    let skeleton_handle = if skeleton_file.ends_with(".json") {
+                        let skeleton = SkeletonData::new_from_json(
+                            asset_server.load(skeleton_file),
+                            asset_server.load(atlas_file),
+                        );
+                        skeletons.add(skeleton)
+                    } else {
+                        let skeleton = SkeletonData::new_from_binary(
+                            asset_server.load(skeleton_file),
+                            asset_server.load(atlas_file),
+                        );
+                        skeletons.add(skeleton)
+                    };
 
                     commands.spawn_bundle(SpineBundle {
                         skeleton: skeleton_handle.clone(),
