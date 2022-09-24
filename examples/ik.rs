@@ -78,6 +78,7 @@ fn ik(mut spine_query: Query<&mut Spine>, windows: Res<Windows>) {
             );
         let cursor = bone
             .parent()
+            .unwrap()
             .world_to_local(cursor_adjustment.x, cursor_adjustment.y);
         bone.set_x(cursor.0);
         bone.set_y(cursor.1);
