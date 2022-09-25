@@ -2,6 +2,14 @@
 name = "bevy_spine"
 version = "0.1.0"
 edition = "2021"
+description = "Spine plugin for Bevy utilizing rusty_spine"
+homepage = "https://github.com/jabuwu/bevy_spine"
+repository = "https://github.com/jabuwu/bevy_spine"
+readme = "readme.md"
+license-file = "LICENSE"
+exclude = [
+    "assets/*",
+]
 
 [dependencies]
 rusty_spine = "0.2"
