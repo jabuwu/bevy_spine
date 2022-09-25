@@ -13,9 +13,10 @@ exclude = [
 
 [dependencies]
 rusty_spine = "0.2"
-bevy = "0.8"
+bevy = { version = "0.8", default-features = false, features = [ "render", "bevy_asset" ] }
 
 [dev-dependencies]
 bevy_egui = "0.16"
 rfd = "0.10"
 lerp = "0.4"
+bevy = { default-features = true }

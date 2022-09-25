@@ -2,11 +2,23 @@
 
 A Bevy Plugin for Spine, utilizing [rusty_spine](https://github.com/jabuwu/rusty_spine). WASM compatible!
 
+```
+[dependencies]
+bevy = "0.8"
+bevy_spine = "0.1.0"
+```
+
+## Versions
+
+| bevy_spine  | rusty_spine | bevy | spine |
+| ----------- | ----------- | ---- | ----- |
+| 0.1.0       | 0.2.0       | 0.8  | 4.1   |
+
 ## Project Status
 
 All Spine features (IK, Paths, Clipping, etc) work. Some models might depend on backface culling being disabled or blend modes. but the default 2D Bevy renderer does not support these (as far as I know). Because of this, a custom renderer may need to be used.
 
-The rusty_spine API still needs some work. Attachments and timelines in particular cannot be manipulated without relying on the C API directly.
+The Bevy API needs a lot of work and feedback is welcome.
 
 ## License
 

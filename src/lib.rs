@@ -1,3 +1,7 @@
+//! There's not much documentation yet. Check out
+//! [the examples](https://github.com/jabuwu/bevy_spine/tree/main/examples) and the
+//! [rusty_spine docs](https://docs.rs/rusty_spine/0.2.0)
+
 use std::{
     collections::VecDeque,
     mem::take,
