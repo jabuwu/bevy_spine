@@ -19,4 +19,4 @@ bevy = { version = "0.8", default-features = false, features = [ "render", "bevy
 bevy_egui = "0.16"
 rfd = "0.10"
 lerp = "0.4"
-bevy = { default-features = true }
+bevy = { version = "0.8", default-features = true }
