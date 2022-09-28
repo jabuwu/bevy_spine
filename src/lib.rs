@@ -28,6 +28,7 @@ use crate::{
 };
 
 pub use assets::*;
+pub use crossfades::Crossfades;
 pub use rusty_spine as rusty;
 pub use rusty_spine::SkeletonController;
 pub use textures::SpineTexture;
@@ -129,6 +130,7 @@ impl SpineLoader {
 pub struct SpineBundle {
     pub loader: SpineLoader,
     pub skeleton: Handle<SkeletonData>,
+    pub crossfades: Crossfades,
     pub transform: Transform,
     pub global_transform: GlobalTransform,
     pub visibility: Visibility,
@@ -155,7 +157,12 @@ struct SpineLoadLocal {
 }
 
 fn spine_load(
-    mut skeleton_query: Query<(&mut SpineLoader, Entity, &Handle<SkeletonData>)>,
+    mut skeleton_query: Query<(
+        &mut SpineLoader,
+        Entity,
+        &Handle<SkeletonData>,
+        Option<&Crossfades>,
+    )>,
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<ColorMaterial>>,
@@ -172,7 +179,7 @@ fn spine_load(
         ready_events.send(SpineReadyEvent(*entity));
     }
     local.ready = vec![];
-    for (mut spine_loader, entity, data_handle) in skeleton_query.iter_mut() {
+    for (mut spine_loader, entity, data_handle, crossfades) in skeleton_query.iter_mut() {
         if matches!(spine_loader.as_ref(), SpineLoader::Loading) {
             let mut skeleton_data_asset =
                 if let Some(skeleton_data_asset) = skeleton_data_assets.get_mut(data_handle) {
@@ -258,8 +265,11 @@ fn spine_load(
                     }
                 }
             };
-            let animation_state_data = Arc::new(AnimationStateData::new(skeleton_data.clone()));
-            let controller = SkeletonController::new(skeleton_data, animation_state_data)
+            let mut animation_state_data = AnimationStateData::new(skeleton_data.clone());
+            if let Some(crossfades) = crossfades {
+                crossfades.apply(&mut animation_state_data);
+            }
+            let controller = SkeletonController::new(skeleton_data, Arc::new(animation_state_data))
                 .with_settings(
                     SkeletonControllerSettings::new()
                         .with_cull_direction(CullDirection::CounterClockwise),
@@ -476,5 +486,6 @@ fn empty_mesh(mesh: &mut Mesh) {
 }
 
 mod assets;
+mod crossfades;
 mod entity_sync;
 mod textures;
