@@ -1,4 +1,4 @@
-use std::path::Path;
+use std::{ffi::OsStr, path::Path};
 
 use bevy::prelude::*;
 use bevy_egui::{egui, EguiContext, EguiPlugin};
@@ -84,19 +84,20 @@ fn ui(
                     for entity in spine_entity_query.iter() {
                         commands.entity(entity).despawn_recursive();
                     }
-                    let skeleton_handle = if skeleton_file.ends_with(".json") {
-                        let skeleton = SkeletonData::new_from_json(
-                            asset_server.load(skeleton_file),
-                            asset_server.load(atlas_file),
-                        );
-                        skeletons.add(skeleton)
-                    } else {
-                        let skeleton = SkeletonData::new_from_binary(
-                            asset_server.load(skeleton_file),
-                            asset_server.load(atlas_file),
-                        );
-                        skeletons.add(skeleton)
-                    };
+                    let skeleton_handle =
+                        if skeleton_file.extension().unwrap_or(OsStr::new("")) == "json" {
+                            let skeleton = SkeletonData::new_from_json(
+                                asset_server.load(skeleton_file),
+                                asset_server.load(atlas_file),
+                            );
+                            skeletons.add(skeleton)
+                        } else {
+                            let skeleton = SkeletonData::new_from_binary(
+                                asset_server.load(skeleton_file),
+                                asset_server.load(atlas_file),
+                            );
+                            skeletons.add(skeleton)
+                        };
 
                     commands.spawn_bundle(SpineBundle {
                         skeleton: skeleton_handle.clone(),
