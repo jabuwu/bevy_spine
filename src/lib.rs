@@ -1,9 +1,10 @@
 //! There's not much documentation yet. Check out
 //! [the examples](https://github.com/jabuwu/bevy_spine/tree/main/examples) and the
-//! [rusty_spine docs](https://docs.rs/rusty_spine/0.2.0)
+//! [rusty_spine docs](https://docs.rs/rusty_spine/0.3.0)
 
 use std::{
     collections::VecDeque,
+    f32::EPSILON,
     mem::take,
     sync::{Arc, Mutex},
 };
@@ -14,9 +15,14 @@ use bevy::{
         mesh::{Indices, MeshVertexAttribute},
         render_resource::{PrimitiveTopology, VertexFormat},
     },
-    sprite::Mesh2dHandle,
+    sprite::{Material2dPlugin, Mesh2dHandle},
 };
-use rusty::Skeleton;
+use materials::{
+    SpineAdditiveMaterial, SpineAdditivePmaMaterial, SpineMultiplyMaterial,
+    SpineMultiplyPmaMaterial, SpineNormalMaterial, SpineNormalPmaMaterial, SpineScreenMaterial,
+    SpineScreenPmaMaterial, SpineShader,
+};
+use rusty_spine::{BlendMode, Skeleton};
 
 use crate::{
     assets::{AtlasLoader, SkeletonJsonLoader},
@@ -47,7 +53,19 @@ pub struct SpinePlugin;
 
 impl Plugin for SpinePlugin {
     fn build(&self, app: &mut App) {
-        app.insert_resource(SpineTextures::init())
+        {
+            let mut shaders = app.world.resource_mut::<Assets<Shader>>();
+            SpineShader::set(shaders.add(Shader::from_wgsl(include_str!("./shader.wgsl",))));
+        }
+        app.add_plugin(Material2dPlugin::<SpineNormalMaterial>::default())
+            .add_plugin(Material2dPlugin::<SpineAdditiveMaterial>::default())
+            .add_plugin(Material2dPlugin::<SpineMultiplyMaterial>::default())
+            .add_plugin(Material2dPlugin::<SpineScreenMaterial>::default())
+            .add_plugin(Material2dPlugin::<SpineNormalPmaMaterial>::default())
+            .add_plugin(Material2dPlugin::<SpineAdditivePmaMaterial>::default())
+            .add_plugin(Material2dPlugin::<SpineMultiplyPmaMaterial>::default())
+            .add_plugin(Material2dPlugin::<SpineScreenPmaMaterial>::default())
+            .insert_resource(SpineTextures::init())
             .add_asset::<Atlas>()
             .add_asset::<SkeletonJson>()
             .add_asset::<SkeletonBinary>()
@@ -165,7 +183,6 @@ fn spine_load(
     )>,
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<ColorMaterial>>,
     mut ready_events: EventWriter<SpineReadyEvent>,
     mut local: Local<SpineLoadLocal>,
     mut skeleton_data_assets: ResMut<Assets<SkeletonData>>,
@@ -187,6 +204,8 @@ fn spine_load(
                 } else {
                     continue;
                 };
+
+            let mut premultipled_alpha = false;
             let skeleton_data = match &mut skeleton_data_asset {
                 SkeletonData::JsonFile {
                     atlas,
@@ -199,6 +218,9 @@ fn spine_load(
                     } else {
                         continue;
                     };
+                    if let Some(page) = atlas.atlas.pages().nth(0) {
+                        premultipled_alpha = page.pma();
+                    }
                     let json = if let Some(json) = jsons.get(&json) {
                         json
                     } else {
@@ -237,6 +259,9 @@ fn spine_load(
                     } else {
                         continue;
                     };
+                    if let Some(page) = atlas.atlas.pages().nth(0) {
+                        premultipled_alpha = page.pma();
+                    }
                     let binary = if let Some(binary) = binaries.get(&binary) {
                         binary
                     } else {
@@ -272,26 +297,25 @@ fn spine_load(
             let controller = SkeletonController::new(skeleton_data, Arc::new(animation_state_data))
                 .with_settings(
                     SkeletonControllerSettings::new()
-                        .with_cull_direction(CullDirection::CounterClockwise),
+                        .with_cull_direction(CullDirection::CounterClockwise)
+                        .with_premultiplied_alpha(premultipled_alpha),
                 );
             commands
                 .entity(entity)
                 .with_children(|parent| {
+                    let mut z = 0.;
                     for _ in controller.skeleton.slots() {
                         let mut mesh = Mesh::new(PrimitiveTopology::TriangleList);
                         empty_mesh(&mut mesh);
                         let mesh_handle = meshes.add(mesh);
                         parent.spawn_bundle((
                             Mesh2dHandle(mesh_handle.clone()),
-                            Transform::default(),
+                            Transform::from_xyz(0., 0., z),
                             GlobalTransform::default(),
                             Visibility::default(),
                             ComputedVisibility::default(),
-                            materials.add(ColorMaterial {
-                                color: Color::NONE,
-                                texture: None,
-                            }),
                         ));
+                        z += EPSILON;
                     }
                     spawn_bones(
                         entity,
@@ -413,27 +437,47 @@ fn spine_update(
 }
 
 fn spine_render(
-    mut spine_query: Query<(&mut Spine, &Children, &Transform)>,
+    mut commands: Commands,
+    mut spine_query: Query<(&mut Spine, &Children)>,
     mut meshes: ResMut<Assets<Mesh>>,
-    mut color_materials: ResMut<Assets<ColorMaterial>>,
-    colored_mesh2d: Query<(&Mesh2dHandle, &Handle<ColorMaterial>)>,
+    mut normal_materials: ResMut<Assets<SpineNormalMaterial>>,
+    mut additive_materials: ResMut<Assets<SpineAdditiveMaterial>>,
+    mut multiply_materials: ResMut<Assets<SpineMultiplyMaterial>>,
+    mut screen_materials: ResMut<Assets<SpineScreenMaterial>>,
+    mut normal_pma_materials: ResMut<Assets<SpineNormalPmaMaterial>>,
+    mut additive_pma_materials: ResMut<Assets<SpineAdditivePmaMaterial>>,
+    mut multiply_pma_materials: ResMut<Assets<SpineMultiplyPmaMaterial>>,
+    mut screen_pma_materials: ResMut<Assets<SpineScreenPmaMaterial>>,
+    mesh_query: Query<(
+        Entity,
+        &Mesh2dHandle,
+        Option<&Handle<SpineNormalMaterial>>,
+        Option<&Handle<SpineAdditiveMaterial>>,
+        Option<&Handle<SpineMultiplyMaterial>>,
+        Option<&Handle<SpineScreenMaterial>>,
+        Option<&Handle<SpineNormalPmaMaterial>>,
+        Option<&Handle<SpineAdditivePmaMaterial>>,
+        Option<&Handle<SpineMultiplyPmaMaterial>>,
+        Option<&Handle<SpineScreenPmaMaterial>>,
+    )>,
     asset_server: Res<AssetServer>,
 ) {
-    for (mut spine, spine_children, spine_transform) in spine_query.iter_mut() {
-        spine.0.settings.cull_direction = CullDirection::CounterClockwise;
-        if spine_transform.scale.x < 0. {
-            if spine_transform.scale.y > 0. {
-                spine.0.settings.cull_direction = CullDirection::Clockwise;
-            }
-        }
-        if spine_transform.scale.y < 0. {
-            if spine_transform.scale.y > 0. {
-                spine.0.settings.cull_direction = CullDirection::Clockwise;
-            }
-        }
+    for (mut spine, spine_children) in spine_query.iter_mut() {
         let mut renderables = spine.0.renderables();
         for (renderable_index, child) in spine_children.iter().enumerate() {
-            if let Ok((mesh_handle, color_material_handle)) = colored_mesh2d.get(*child) {
+            if let Ok((
+                mesh_entity,
+                mesh_handle,
+                normal_material_handle,
+                additive_material_handle,
+                multiply_material_handle,
+                screen_material_handle,
+                normal_pma_material_handle,
+                additive_pma_material_handle,
+                multiply_pma_material_handle,
+                screen_pma_material_handle,
+            )) = mesh_query.get(*child)
+            {
                 let mesh = meshes.get_mut(&mesh_handle.0).unwrap();
                 if let Some(renderable) = renderables.get_mut(renderable_index) {
                     let mut normals = vec![];
@@ -447,23 +491,106 @@ fn spine_render(
                     );
                     mesh.insert_attribute(Mesh::ATTRIBUTE_NORMAL, normals);
                     mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, take(&mut renderable.uvs));
-                    if let Some(color_material) = color_materials.get_mut(color_material_handle) {
-                        color_material.color.set_r(renderable.color.r);
-                        color_material.color.set_g(renderable.color.g);
-                        color_material.color.set_b(renderable.color.b);
-                        color_material.color.set_a(renderable.color.a);
-                        let texture_path = if let Some(attachment_render_object) =
-                            renderable.attachment_renderer_object
-                        {
-                            let spine_texture =
-                                unsafe { &mut *(attachment_render_object as *mut SpineTexture) };
-                            Some(spine_texture.0.clone())
-                        } else {
-                            None
+
+                    macro_rules! apply_material {
+                        ($condition:expr, $material:ty, $handle:ident, $assets:ident) => {
+                            if let Some(attachment_render_object) =
+                                renderable.attachment_renderer_object
+                            {
+                                let spine_texture = unsafe {
+                                    &mut *(attachment_render_object as *mut SpineTexture)
+                                };
+                                let texture_path = spine_texture.0.clone();
+                                if $condition {
+                                    let handle = if let Some(handle) = $handle {
+                                        handle.clone()
+                                    } else {
+                                        let handle = $assets.add(<$material>::new(
+                                            asset_server.load(texture_path.as_str()),
+                                        ));
+                                        commands.entity(mesh_entity).insert(handle.clone());
+                                        handle
+                                    };
+                                    if let Some(material) = $assets.get_mut(&handle) {
+                                        material.color.set_r(renderable.color.r);
+                                        material.color.set_g(renderable.color.g);
+                                        material.color.set_b(renderable.color.b);
+                                        material.color.set_a(renderable.color.a);
+                                        material.dark_color.set_r(renderable.dark_color.r);
+                                        material.dark_color.set_g(renderable.dark_color.g);
+                                        material.dark_color.set_b(renderable.dark_color.b);
+                                        material.dark_color.set_a(renderable.dark_color.a);
+                                        material.image = asset_server.load(texture_path.as_str());
+                                    }
+                                } else {
+                                    if $handle.is_some() {
+                                        commands.entity(mesh_entity).remove::<Handle<$material>>();
+                                    }
+                                }
+                            } else {
+                                if $handle.is_some() {
+                                    commands.entity(mesh_entity).remove::<Handle<$material>>();
+                                }
+                            }
                         };
-                        color_material.texture =
-                            texture_path.map(|p| asset_server.load(p.as_str()));
                     }
+
+                    apply_material!(
+                        renderable.blend_mode == BlendMode::Normal
+                            && renderable.premultiplied_alpha == false,
+                        SpineNormalMaterial,
+                        normal_material_handle,
+                        normal_materials
+                    );
+                    apply_material!(
+                        renderable.blend_mode == BlendMode::Additive
+                            && renderable.premultiplied_alpha == false,
+                        SpineAdditiveMaterial,
+                        additive_material_handle,
+                        additive_materials
+                    );
+                    apply_material!(
+                        renderable.blend_mode == BlendMode::Multiply
+                            && renderable.premultiplied_alpha == false,
+                        SpineMultiplyMaterial,
+                        multiply_material_handle,
+                        multiply_materials
+                    );
+                    apply_material!(
+                        renderable.blend_mode == BlendMode::Screen
+                            && renderable.premultiplied_alpha == false,
+                        SpineScreenMaterial,
+                        screen_material_handle,
+                        screen_materials
+                    );
+                    apply_material!(
+                        renderable.blend_mode == BlendMode::Normal
+                            && renderable.premultiplied_alpha == true,
+                        SpineNormalPmaMaterial,
+                        normal_pma_material_handle,
+                        normal_pma_materials
+                    );
+                    apply_material!(
+                        renderable.blend_mode == BlendMode::Additive
+                            && renderable.premultiplied_alpha == true,
+                        SpineAdditivePmaMaterial,
+                        additive_pma_material_handle,
+                        additive_pma_materials
+                    );
+                    apply_material!(
+                        renderable.blend_mode == BlendMode::Multiply
+                            && renderable.premultiplied_alpha == true,
+                        SpineMultiplyPmaMaterial,
+                        multiply_pma_material_handle,
+                        multiply_pma_materials
+                    );
+                    apply_material!(
+                        renderable.blend_mode == BlendMode::Screen
+                            && renderable.premultiplied_alpha == true,
+                        SpineScreenPmaMaterial,
+                        screen_pma_material_handle,
+                        screen_pma_materials
+                    );
                 } else {
                     empty_mesh(mesh);
                 }
@@ -488,4 +615,5 @@ fn empty_mesh(mesh: &mut Mesh) {
 mod assets;
 mod crossfades;
 mod entity_sync;
+mod materials;
 mod textures;

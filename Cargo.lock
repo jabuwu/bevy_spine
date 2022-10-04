@@ -2293,6 +2293,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "mint"
+version = "0.5.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e53debba6bda7a793e5f99b8dacf19e626084f525f7829104ba9898f367d85ff"
+
+[[package]]
 name = "mio"
 version = "0.8.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2977,9 +2983,12 @@ dependencies = [
 
 [[package]]
 name = "rusty_spine"
-version = "0.2.0"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3720abac47bba84337c5eb384b9e5ffd0e95d91db988754edcb51852c07feca9"
+checksum = "6075611993e93ce5959ff79c14d8ccefef584ef722ef236cd64de0793e6a6635"
+dependencies = [
+ "mint",
+]
 
 [[package]]
 name = "ryu"

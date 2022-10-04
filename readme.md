@@ -16,9 +16,7 @@ bevy_spine = "0.1.0"
 
 ## Project Status
 
-All Spine features (IK, Paths, Clipping, etc) work. Some models might depend on backface culling being disabled or blend modes. but the default 2D Bevy renderer does not support these (as far as I know). Because of this, a custom renderer may need to be used.
-
-The Bevy API needs a lot of work and feedback is welcome.
+All Spine features are implemented. If you notice something is broken, please submit an issue. The Bevy API needs a lot of work and feedback is welcome.
 
 ## License
 
