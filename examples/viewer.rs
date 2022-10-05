@@ -1,6 +1,6 @@
 use std::{ffi::OsStr, path::Path};
 
-use bevy::{prelude::*, render::texture::ImageSettings};
+use bevy::prelude::*;
 use bevy_egui::{egui, EguiContext, EguiPlugin};
 use bevy_spine::{
     SkeletonController, SkeletonData, Spine, SpineBundle, SpinePlugin, SpineReadyEvent, SpineSystem,
@@ -12,8 +12,7 @@ use rusty_spine::debugger::egui::egui_spine_debugger;
 
 fn main() {
     let mut app = App::new();
-    app.insert_resource(ImageSettings::default_nearest())
-        .add_plugins(DefaultPlugins)
+    app.add_plugins(DefaultPlugins)
         .add_plugin(SpinePlugin)
         .add_plugin(EguiPlugin)
         .add_startup_system(setup)

@@ -189,6 +189,7 @@ fn spine_load(
     mut ready_events: EventWriter<SpineReadyEvent>,
     mut local: Local<SpineLoadLocal>,
     mut skeleton_data_assets: ResMut<Assets<SkeletonData>>,
+    mut images: ResMut<Assets<Image>>,
     atlases: Res<Assets<Atlas>>,
     jsons: Res<Assets<SkeletonJson>>,
     binaries: Res<Assets<SkeletonBinary>>,
@@ -333,7 +334,7 @@ fn spine_load(
         }
     }
 
-    spine_textures.update(asset_server.as_ref());
+    spine_textures.update(asset_server.as_ref(), images.as_mut());
 }
 
 fn spawn_bones(
