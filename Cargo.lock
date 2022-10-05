@@ -2992,7 +2992,9 @@ dependencies = [
 
 [[package]]
 name = "rusty_spine"
-version = "0.3.0"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4f2fd49bc5f6fa7643b712ee3f11e5fdc36d367ec6d0c7daba37fc3adc7225db"
 dependencies = [
  "egui",
  "egui_extras",
