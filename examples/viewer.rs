@@ -1,22 +1,28 @@
 use std::{ffi::OsStr, path::Path};
 
-use bevy::prelude::*;
+use bevy::{prelude::*, render::texture::ImageSettings};
 use bevy_egui::{egui, EguiContext, EguiPlugin};
 use bevy_spine::{
     SkeletonController, SkeletonData, Spine, SpineBundle, SpinePlugin, SpineReadyEvent, SpineSystem,
 };
 use rfd::FileDialog;
 
+#[cfg(feature = "egui_debugger")]
+use rusty_spine::debugger::egui::egui_spine_debugger;
+
 fn main() {
-    App::new()
+    let mut app = App::new();
+    app.insert_resource(ImageSettings::default_nearest())
         .add_plugins(DefaultPlugins)
         .add_plugin(SpinePlugin)
         .add_plugin(EguiPlugin)
         .add_startup_system(setup)
         .add_system(on_spawn.before(SpineSystem::Update))
         // MUST be an exclusive system for RFD to work on MacOS
-        .add_system(ui.exclusive_system())
-        .run();
+        .add_system(ui.exclusive_system());
+    #[cfg(feature = "egui_debugger")]
+    app.add_system(spine_debugger);
+    app.run();
 }
 
 fn setup(
@@ -28,7 +34,7 @@ fn setup(
 
     let skeleton = SkeletonData::new_from_json(
         asset_server.load("spineboy/export/spineboy-pro.json"),
-        asset_server.load("spineboy/export/spineboy.atlas"),
+        asset_server.load("spineboy/export/spineboy-pma.atlas"),
     );
     let skeleton_handle = skeletons.add(skeleton);
 
@@ -48,7 +54,7 @@ fn on_spawn(
             let Spine(SkeletonController {
                 animation_state, ..
             }) = spine.as_mut();
-            let _ = animation_state.set_animation_by_name(0, "run", true);
+            let _ = animation_state.set_animation_by_name(0, "idle", true);
         }
     }
 }
@@ -133,4 +139,16 @@ fn ui(
             }
         });
     });
+}
+
+#[cfg(feature = "egui_debugger")]
+fn spine_debugger(mut egui_context: ResMut<EguiContext>, mut spine_query: Query<&mut Spine>) {
+    for mut spine in spine_query.iter_mut() {
+        let Spine(SkeletonController {
+            skeleton,
+            animation_state,
+            ..
+        }) = spine.as_mut();
+        egui_spine_debugger(egui_context.ctx_mut(), "Spine", skeleton, animation_state);
+    }
 }
