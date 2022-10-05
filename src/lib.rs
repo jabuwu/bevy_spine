@@ -55,7 +55,10 @@ impl Plugin for SpinePlugin {
     fn build(&self, app: &mut App) {
         {
             let mut shaders = app.world.resource_mut::<Assets<Shader>>();
-            SpineShader::set(shaders.add(Shader::from_wgsl(include_str!("./shader.wgsl",))));
+            SpineShader::set(
+                shaders.add(Shader::from_wgsl(include_str!("./shader.wgsl"))),
+                shaders.add(Shader::from_wgsl(include_str!("./shader_pma.wgsl"))),
+            );
         }
         app.add_plugin(Material2dPlugin::<SpineNormalMaterial>::default())
             .add_plugin(Material2dPlugin::<SpineAdditiveMaterial>::default())
@@ -186,9 +189,9 @@ fn spine_load(
     mut ready_events: EventWriter<SpineReadyEvent>,
     mut local: Local<SpineLoadLocal>,
     mut skeleton_data_assets: ResMut<Assets<SkeletonData>>,
-    atlases: ResMut<Assets<Atlas>>,
-    jsons: ResMut<Assets<SkeletonJson>>,
-    binaries: ResMut<Assets<SkeletonBinary>>,
+    atlases: Res<Assets<Atlas>>,
+    jsons: Res<Assets<SkeletonJson>>,
+    binaries: Res<Assets<SkeletonBinary>>,
     spine_textures: Res<SpineTextures>,
     asset_server: Res<AssetServer>,
 ) {

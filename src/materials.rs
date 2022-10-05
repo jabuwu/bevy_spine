@@ -16,6 +16,7 @@ use bevy::{
 #[derive(Default)]
 pub(crate) struct SpineShader {
     handle: Handle<Shader>,
+    handle_pma: Handle<Shader>,
 }
 
 impl SpineShader {
@@ -31,12 +32,17 @@ impl SpineShader {
         }
     }
 
-    pub(crate) fn set(handle: Handle<Shader>) {
+    pub(crate) fn set(handle: Handle<Shader>, handle_pma: Handle<Shader>) {
         SpineShader::singleton().lock().unwrap().handle = handle;
+        SpineShader::singleton().lock().unwrap().handle_pma = handle_pma;
     }
 
     pub(crate) fn get() -> Handle<Shader> {
         SpineShader::singleton().lock().unwrap().handle.clone()
+    }
+
+    pub(crate) fn get_pma() -> Handle<Shader> {
+        SpineShader::singleton().lock().unwrap().handle_pma.clone()
     }
 }
 
@@ -276,7 +282,7 @@ impl SpineNormalPmaMaterial {
 
 impl Material2d for SpineNormalPmaMaterial {
     fn fragment_shader() -> ShaderRef {
-        SpineShader::get().into()
+        SpineShader::get_pma().into()
     }
 
     fn specialize(
@@ -329,7 +335,7 @@ impl SpineAdditivePmaMaterial {
 
 impl Material2d for SpineAdditivePmaMaterial {
     fn fragment_shader() -> ShaderRef {
-        SpineShader::get().into()
+        SpineShader::get_pma().into()
     }
 
     fn specialize(
@@ -382,7 +388,7 @@ impl SpineMultiplyPmaMaterial {
 
 impl Material2d for SpineMultiplyPmaMaterial {
     fn fragment_shader() -> ShaderRef {
-        SpineShader::get().into()
+        SpineShader::get_pma().into()
     }
 
     fn specialize(
@@ -435,7 +441,7 @@ impl SpineScreenPmaMaterial {
 
 impl Material2d for SpineScreenPmaMaterial {
     fn fragment_shader() -> ShaderRef {
-        SpineShader::get().into()
+        SpineShader::get_pma().into()
     }
 
     fn specialize(
