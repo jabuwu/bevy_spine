@@ -5,14 +5,14 @@ A Bevy Plugin for [Spine 4.1](http://esotericsoftware.com/), utilizing [rusty_sp
 ```
 [dependencies]
 bevy = "0.8"
-bevy_spine = "0.1.0"
+bevy_spine = "0.2"
 ```
 
 ## Versions
 
 | bevy_spine  | rusty_spine | bevy | spine |
 | ----------- | ----------- | ---- | ----- |
-| 0.1.0       | 0.2.0       | 0.8  | 4.1   |
+| 0.2.0       | 0.3.2       | 0.8  | 4.1   |
 
 ## Project Status
 
