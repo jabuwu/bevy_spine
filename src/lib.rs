@@ -114,6 +114,7 @@ pub struct Spine(pub SkeletonController);
 pub struct SpineBone {
     pub spine_entity: Entity,
     pub handle: BoneHandle,
+    pub name: String,
 }
 
 #[derive(Component)]
@@ -357,6 +358,7 @@ fn spawn_bones(
             .insert(SpineBone {
                 spine_entity,
                 handle: bone.handle(),
+                name: bone.data().name().to_owned(),
             })
             .with_children(|parent| {
                 for child in bone.children() {
