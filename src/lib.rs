@@ -26,7 +26,6 @@ use rusty_spine::{BlendMode, Skeleton};
 
 use crate::{
     assets::{AtlasLoader, SkeletonJsonLoader},
-    entity_sync::{spine_sync_bones, spine_sync_entities, spine_sync_entities_applied},
     rusty::{
         draw::CullDirection, AnimationStateData, BoneHandle, EventType, SkeletonControllerSettings,
     },
@@ -35,6 +34,7 @@ use crate::{
 
 pub use assets::*;
 pub use crossfades::Crossfades;
+pub use entity_sync::*;
 pub use rusty_spine as rusty;
 pub use rusty_spine::SkeletonController;
 pub use textures::SpineTexture;
@@ -43,9 +43,6 @@ pub use textures::SpineTexture;
 pub enum SpineSystem {
     Load,
     Update,
-    SyncEntities,
-    SyncBones,
-    SyncEntitiesApplied,
     Render,
 }
 
@@ -68,6 +65,7 @@ impl Plugin for SpinePlugin {
             .add_plugin(Material2dPlugin::<SpineAdditivePmaMaterial>::default())
             .add_plugin(Material2dPlugin::<SpineMultiplyPmaMaterial>::default())
             .add_plugin(Material2dPlugin::<SpineScreenPmaMaterial>::default())
+            .add_plugin(SpineSyncPlugin::default())
             .insert_resource(SpineTextures::init())
             .add_asset::<Atlas>()
             .add_asset::<SkeletonJson>()
@@ -84,26 +82,7 @@ impl Plugin for SpinePlugin {
                     .label(SpineSystem::Update)
                     .after(SpineSystem::Load),
             )
-            .add_system(
-                spine_sync_entities
-                    .label(SpineSystem::SyncEntities)
-                    .after(SpineSystem::Update),
-            )
-            .add_system(
-                spine_sync_bones
-                    .label(SpineSystem::SyncBones)
-                    .after(SpineSystem::SyncEntities),
-            )
-            .add_system(
-                spine_sync_entities_applied
-                    .label(SpineSystem::SyncEntitiesApplied)
-                    .after(SpineSystem::SyncBones),
-            )
-            .add_system(
-                spine_render
-                    .label(SpineSystem::Render)
-                    .after(SpineSystem::SyncEntitiesApplied),
-            );
+            .add_system(spine_render.label(SpineSystem::Render));
     }
 }
 
@@ -134,17 +113,34 @@ impl core::ops::DerefMut for Spine {
     }
 }
 
-#[derive(Default, Component)]
+#[derive(Component)]
 pub enum SpineLoader {
-    #[default]
-    Loading,
+    Loading { with_children: bool },
     Ready,
     Failed,
 }
 
+impl Default for SpineLoader {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl SpineLoader {
     pub fn new() -> Self {
-        Self::default()
+        Self::with_children()
+    }
+
+    pub fn with_children() -> Self {
+        Self::Loading {
+            with_children: true,
+        }
+    }
+
+    pub fn without_children() -> Self {
+        Self::Loading {
+            with_children: false,
+        }
     }
 }
 
@@ -206,7 +202,7 @@ fn spine_load(
     }
     local.ready_events = vec![];
     for (mut spine_loader, entity, data_handle, crossfades) in skeleton_query.iter_mut() {
-        if matches!(spine_loader.as_ref(), SpineLoader::Loading) {
+        if let SpineLoader::Loading { with_children } = spine_loader.as_ref() {
             let mut skeleton_data_asset =
                 if let Some(skeleton_data_asset) = skeleton_data_assets.get_mut(data_handle) {
                     skeleton_data_asset
@@ -251,7 +247,7 @@ fn spine_load(
                             }
                             Err(_err) => {
                                 // TODO: print error?
-                                *spine_loader = SpineLoader::Loading;
+                                *spine_loader = SpineLoader::Failed;
                                 continue;
                             }
                         }
@@ -292,7 +288,7 @@ fn spine_load(
                             }
                             Err(_err) => {
                                 // TODO: print error?
-                                *spine_loader = SpineLoader::Loading;
+                                *spine_loader = SpineLoader::Failed;
                                 continue;
                             }
                         }
@@ -327,13 +323,15 @@ fn spine_load(
                         ));
                         z += EPSILON;
                     }
-                    spawn_bones(
-                        entity,
-                        parent,
-                        &controller.skeleton,
-                        controller.skeleton.bone_root().handle(),
-                        &mut bones,
-                    );
+                    if *with_children {
+                        spawn_bones(
+                            entity,
+                            parent,
+                            &controller.skeleton,
+                            controller.skeleton.bone_root().handle(),
+                            &mut bones,
+                        );
+                    }
                 })
                 .insert(Spine(controller));
             *spine_loader = SpineLoader::Ready;
@@ -633,3 +631,5 @@ mod crossfades;
 mod entity_sync;
 mod materials;
 mod textures;
+
+pub mod prelude;

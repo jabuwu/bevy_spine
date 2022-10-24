@@ -1,8 +1,5 @@
 use bevy::prelude::*;
-use bevy_spine::{
-    SkeletonController, SkeletonData, Spine, SpineBone, SpineBundle, SpineEvent, SpineReadyEvent,
-    SpineSystem,
-};
+use bevy_spine::prelude::*;
 use lerp::Lerp;
 
 use crate::bullet::{BulletSpawnEvent, BulletSystem};
@@ -35,29 +32,28 @@ impl Plugin for PlayerPlugin {
             .add_system(
                 player_spine_events
                     .label(PlayerSystem::SpineEvents)
-                    .before(SpineSystem::SyncEntities),
+                    .before_spine_sync::<SpineSync>(),
             )
             .add_system(
                 player_aim
                     .label(PlayerSystem::Aim)
-                    .after(SpineSystem::SyncEntities)
-                    .before(SpineSystem::SyncBones),
+                    .during_spine_sync::<SpineSync>(),
             )
             .add_system(
                 player_shoot
                     .label(PlayerSystem::Shoot)
-                    .after(SpineSystem::SyncBones)
+                    .after_spine_sync::<SpineSync>()
                     .before(BulletSystem::Spawn),
             )
             .add_system(
                 player_move
                     .label(PlayerSystem::Move)
-                    .before(SpineSystem::Update),
+                    .before_spine_sync::<SpineSync>(),
             )
             .add_system(
                 player_jump
                     .label(PlayerSystem::Jump)
-                    .before(SpineSystem::Update),
+                    .before_spine_sync::<SpineSync>(),
             );
     }
 }
@@ -92,6 +88,7 @@ fn player_spawn(mut commands: Commands, mut player_spawn_events: EventReader<Pla
                 transform: Transform::from_xyz(-300., -200., 0.).with_scale(Vec3::ONE * 0.25),
                 ..Default::default()
             })
+            .insert(SpineSync)
             .insert(Player {
                 spawned: false,
                 movement_velocity: 0.,
