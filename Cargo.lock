@@ -718,6 +718,7 @@ version = "0.2.0"
 dependencies = [
  "bevy",
  "bevy_egui",
+ "glam",
  "lerp",
  "rfd",
  "rusty_spine",
@@ -1720,6 +1721,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "518faa5064866338b013ff9b2350dc318e14cc4fcd6cb8206d7e7c9886c98815"
 dependencies = [
  "bytemuck",
+ "mint",
  "serde",
 ]
 
