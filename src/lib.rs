@@ -181,6 +181,7 @@ struct SpineLoadLocal {
     ready_events: Vec<SpineReadyEvent>,
 }
 
+#[allow(clippy::too_many_arguments)]
 fn spine_load(
     mut skeleton_query: Query<(
         &mut SpineLoader,
@@ -226,10 +227,10 @@ fn spine_load(
                     } else {
                         continue;
                     };
-                    if let Some(page) = atlas.atlas.pages().nth(0) {
+                    if let Some(page) = atlas.atlas.pages().next() {
                         premultipled_alpha = page.pma();
                     }
-                    let json = if let Some(json) = jsons.get(&json) {
+                    let json = if let Some(json) = jsons.get(json) {
                         json
                     } else {
                         continue;
@@ -267,10 +268,10 @@ fn spine_load(
                     } else {
                         continue;
                     };
-                    if let Some(page) = atlas.atlas.pages().nth(0) {
+                    if let Some(page) = atlas.atlas.pages().next() {
                         premultipled_alpha = page.pma();
                     }
-                    let binary = if let Some(binary) = binaries.get(&binary) {
+                    let binary = if let Some(binary) = binaries.get(binary) {
                         binary
                     } else {
                         continue;
@@ -450,6 +451,7 @@ fn spine_update(
     }
 }
 
+#[allow(clippy::type_complexity, clippy::too_many_arguments)]
 fn spine_render(
     mut commands: Commands,
     mut spine_query: Query<(&mut Spine, &Children)>,
@@ -551,56 +553,56 @@ fn spine_render(
 
                     apply_material!(
                         renderable.blend_mode == BlendMode::Normal
-                            && renderable.premultiplied_alpha == false,
+                            && !renderable.premultiplied_alpha,
                         SpineNormalMaterial,
                         normal_material_handle,
                         normal_materials
                     );
                     apply_material!(
                         renderable.blend_mode == BlendMode::Additive
-                            && renderable.premultiplied_alpha == false,
+                            && !renderable.premultiplied_alpha,
                         SpineAdditiveMaterial,
                         additive_material_handle,
                         additive_materials
                     );
                     apply_material!(
                         renderable.blend_mode == BlendMode::Multiply
-                            && renderable.premultiplied_alpha == false,
+                            && !renderable.premultiplied_alpha,
                         SpineMultiplyMaterial,
                         multiply_material_handle,
                         multiply_materials
                     );
                     apply_material!(
                         renderable.blend_mode == BlendMode::Screen
-                            && renderable.premultiplied_alpha == false,
+                            && !renderable.premultiplied_alpha,
                         SpineScreenMaterial,
                         screen_material_handle,
                         screen_materials
                     );
                     apply_material!(
                         renderable.blend_mode == BlendMode::Normal
-                            && renderable.premultiplied_alpha == true,
+                            && renderable.premultiplied_alpha,
                         SpineNormalPmaMaterial,
                         normal_pma_material_handle,
                         normal_pma_materials
                     );
                     apply_material!(
                         renderable.blend_mode == BlendMode::Additive
-                            && renderable.premultiplied_alpha == true,
+                            && renderable.premultiplied_alpha,
                         SpineAdditivePmaMaterial,
                         additive_pma_material_handle,
                         additive_pma_materials
                     );
                     apply_material!(
                         renderable.blend_mode == BlendMode::Multiply
-                            && renderable.premultiplied_alpha == true,
+                            && renderable.premultiplied_alpha,
                         SpineMultiplyPmaMaterial,
                         multiply_pma_material_handle,
                         multiply_pma_materials
                     );
                     apply_material!(
                         renderable.blend_mode == BlendMode::Screen
-                            && renderable.premultiplied_alpha == true,
+                            && renderable.premultiplied_alpha,
                         SpineScreenPmaMaterial,
                         screen_pma_material_handle,
                         screen_pma_materials

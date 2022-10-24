@@ -25,7 +25,10 @@ impl AssetLoader for AtlasLoader {
         Box::pin(async move {
             match rusty_spine::Atlas::new(
                 bytes,
-                load_context.path().parent().unwrap_or(Path::new("")),
+                load_context
+                    .path()
+                    .parent()
+                    .unwrap_or_else(|| Path::new("")),
             ) {
                 Ok(atlas) => {
                     load_context.set_default_asset(LoadedAsset::new(Atlas {
