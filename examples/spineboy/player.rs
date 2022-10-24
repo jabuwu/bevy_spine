@@ -106,7 +106,7 @@ fn player_spine_ready(
     mut commands: Commands,
 ) {
     for event in spine_ready_events.iter() {
-        if let Ok((mut spine, spine_entity)) = spine_query.get_mut(event.0) {
+        if let Ok((mut spine, spine_entity)) = spine_query.get_mut(event.entity) {
             let Spine(SkeletonController {
                 animation_state,
                 skeleton,

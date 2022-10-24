@@ -3,7 +3,7 @@
 //! [rusty_spine docs](https://docs.rs/rusty_spine/0.3.0)
 
 use std::{
-    collections::VecDeque,
+    collections::{HashMap, VecDeque},
     f32::EPSILON,
     mem::take,
     sync::{Arc, Mutex},
@@ -160,7 +160,10 @@ pub struct SpineBundle {
 }
 
 #[derive(Clone)]
-pub struct SpineReadyEvent(pub Entity);
+pub struct SpineReadyEvent {
+    pub entity: Entity,
+    pub bones: HashMap<String, Entity>,
+}
 
 #[derive(Clone)]
 pub enum SpineEvent {
@@ -175,7 +178,7 @@ pub enum SpineEvent {
 #[derive(Default)]
 struct SpineLoadLocal {
     // used for a one-frame delay in sending ready events
-    ready: Vec<Entity>,
+    ready_events: Vec<SpineReadyEvent>,
 }
 
 fn spine_load(
@@ -197,10 +200,10 @@ fn spine_load(
     spine_textures: Res<SpineTextures>,
     asset_server: Res<AssetServer>,
 ) {
-    for entity in local.ready.iter() {
-        ready_events.send(SpineReadyEvent(*entity));
+    for event in local.ready_events.iter() {
+        ready_events.send(event.clone());
     }
-    local.ready = vec![];
+    local.ready_events = vec![];
     for (mut spine_loader, entity, data_handle, crossfades) in skeleton_query.iter_mut() {
         if matches!(spine_loader.as_ref(), SpineLoader::Loading) {
             let mut skeleton_data_asset =
@@ -305,6 +308,7 @@ fn spine_load(
                         .with_cull_direction(CullDirection::CounterClockwise)
                         .with_premultiplied_alpha(premultipled_alpha),
                 );
+            let mut bones = HashMap::new();
             commands
                 .entity(entity)
                 .with_children(|parent| {
@@ -327,11 +331,12 @@ fn spine_load(
                         parent,
                         &controller.skeleton,
                         controller.skeleton.bone_root().handle(),
+                        &mut bones,
                     );
                 })
                 .insert(Spine(controller));
             *spine_loader = SpineLoader::Ready;
-            local.ready.push(entity);
+            local.ready_events.push(SpineReadyEvent { entity, bones });
         }
     }
 
@@ -343,9 +348,10 @@ fn spawn_bones(
     parent: &mut ChildBuilder,
     skeleton: &Skeleton,
     bone: BoneHandle,
+    bones: &mut HashMap<String, Entity>,
 ) {
     if let Some(bone) = bone.get(skeleton) {
-        parent
+        let bone_entity = parent
             .spawn_bundle(SpriteBundle {
                 sprite: Sprite {
                     custom_size: Some(Vec2::new(8., 32.)),
@@ -362,9 +368,11 @@ fn spawn_bones(
             })
             .with_children(|parent| {
                 for child in bone.children() {
-                    spawn_bones(spine_entity, parent, skeleton, child.handle());
+                    spawn_bones(spine_entity, parent, skeleton, child.handle(), bones);
                 }
-            });
+            })
+            .id();
+        bones.insert(bone.data().name().to_owned(), bone_entity);
     }
 }
 
@@ -381,7 +389,7 @@ fn spine_update(
     local: Local<SpineUpdateLocal>,
 ) {
     for event in spine_ready_events.iter() {
-        if let Ok((entity, mut spine)) = spine_query.get_mut(event.0) {
+        if let Ok((entity, mut spine)) = spine_query.get_mut(event.entity) {
             let events = local.events.clone();
             spine.animation_state.set_listener(
                 move |_animation_state, event_type, track_entry, spine_event| match event_type {
