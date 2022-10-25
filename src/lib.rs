@@ -361,15 +361,12 @@ fn spawn_bones(
         transform.scale.x = bone.applied_scale_x();
         transform.scale.y = bone.applied_scale_y();
         let bone_entity = parent
-            .spawn_bundle(SpriteBundle {
-                sprite: Sprite {
-                    custom_size: Some(Vec2::new(8., 32.)),
-                    color: Color::NONE,
-                    ..Default::default()
-                },
+            .spawn_bundle((
                 transform,
-                ..Default::default()
-            })
+                GlobalTransform::default(),
+                Visibility::default(),
+                ComputedVisibility::default(),
+            ))
             .insert(SpineBone {
                 spine_entity,
                 handle: bone.handle(),
