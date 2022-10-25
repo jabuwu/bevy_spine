@@ -6,6 +6,8 @@
 // re-multiply the alpha. Seems to kinda defeat the point but here we are. Will need to
 // investigate further.
 
+// See: https://github.com/bevyengine/bevy/issues/6315
+
 struct VertexOutput {
     @builtin(position) clip_position: vec4<f32>,
     @location(0) world_position: vec4<f32>,
