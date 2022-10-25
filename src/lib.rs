@@ -54,8 +54,9 @@ impl Plugin for SpinePlugin {
         {
             let mut shaders = app.world.resource_mut::<Assets<Shader>>();
             SpineShader::set(
-                shaders.add(Shader::from_wgsl(include_str!("./shader.wgsl"))),
-                shaders.add(Shader::from_wgsl(include_str!("./shader_pma.wgsl"))),
+                shaders.add(Shader::from_wgsl(include_str!("./vertex.wgsl"))),
+                shaders.add(Shader::from_wgsl(include_str!("./fragment.wgsl"))),
+                shaders.add(Shader::from_wgsl(include_str!("./fragment_pma.wgsl"))),
             );
         }
         app.add_plugin(Material2dPlugin::<SpineNormalMaterial>::default())
@@ -312,12 +313,16 @@ fn spine_load(
             commands
                 .entity(entity)
                 .with_children(|parent| {
+                    // TODO: currently, a mesh is created for each slot, however since we use the
+                    // combined drawer, this many meshes is usually not necessary. instead, we
+                    // may want to dynamically create meshes as needed in the render system
                     let mut z = 0.;
                     for _ in controller.skeleton.slots() {
                         let mut mesh = Mesh::new(PrimitiveTopology::TriangleList);
                         empty_mesh(&mut mesh);
                         let mesh_handle = meshes.add(mesh);
                         parent.spawn_bundle((
+                            SpineMesh,
                             Mesh2dHandle(mesh_handle.clone()),
                             Transform::from_xyz(0., 0., z),
                             GlobalTransform::default(),
@@ -469,22 +474,25 @@ fn spine_render(
     mut additive_pma_materials: ResMut<Assets<SpineAdditivePmaMaterial>>,
     mut multiply_pma_materials: ResMut<Assets<SpineMultiplyPmaMaterial>>,
     mut screen_pma_materials: ResMut<Assets<SpineScreenPmaMaterial>>,
-    mesh_query: Query<(
-        Entity,
-        &Mesh2dHandle,
-        Option<&Handle<SpineNormalMaterial>>,
-        Option<&Handle<SpineAdditiveMaterial>>,
-        Option<&Handle<SpineMultiplyMaterial>>,
-        Option<&Handle<SpineScreenMaterial>>,
-        Option<&Handle<SpineNormalPmaMaterial>>,
-        Option<&Handle<SpineAdditivePmaMaterial>>,
-        Option<&Handle<SpineMultiplyPmaMaterial>>,
-        Option<&Handle<SpineScreenPmaMaterial>>,
-    )>,
+    mesh_query: Query<
+        (
+            Entity,
+            &Mesh2dHandle,
+            Option<&Handle<SpineNormalMaterial>>,
+            Option<&Handle<SpineAdditiveMaterial>>,
+            Option<&Handle<SpineMultiplyMaterial>>,
+            Option<&Handle<SpineScreenMaterial>>,
+            Option<&Handle<SpineNormalPmaMaterial>>,
+            Option<&Handle<SpineAdditivePmaMaterial>>,
+            Option<&Handle<SpineMultiplyPmaMaterial>>,
+            Option<&Handle<SpineScreenPmaMaterial>>,
+        ),
+        With<SpineMesh>,
+    >,
     asset_server: Res<AssetServer>,
 ) {
     for (mut spine, spine_children) in spine_query.iter_mut() {
-        let mut renderables = spine.0.renderables();
+        let mut renderables = spine.0.combined_renderables();
         for (renderable_index, child) in spine_children.iter().enumerate() {
             if let Ok((
                 mesh_entity,
@@ -512,6 +520,11 @@ fn spine_render(
                     );
                     mesh.insert_attribute(Mesh::ATTRIBUTE_NORMAL, normals);
                     mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, take(&mut renderable.uvs));
+                    mesh.insert_attribute(Mesh::ATTRIBUTE_COLOR, take(&mut renderable.colors));
+                    mesh.insert_attribute(
+                        MeshVertexAttribute::new("Vertex_DarkColor", 5, VertexFormat::Float32x4),
+                        take(&mut renderable.dark_colors),
+                    );
 
                     macro_rules! apply_material {
                         ($condition:expr, $material:ty, $handle:ident, $assets:ident) => {
@@ -533,14 +546,6 @@ fn spine_render(
                                         handle
                                     };
                                     if let Some(material) = $assets.get_mut(&handle) {
-                                        material.color.set_r(renderable.color.r);
-                                        material.color.set_g(renderable.color.g);
-                                        material.color.set_b(renderable.color.b);
-                                        material.color.set_a(renderable.color.a);
-                                        material.dark_color.set_r(renderable.dark_color.r);
-                                        material.dark_color.set_g(renderable.dark_color.g);
-                                        material.dark_color.set_b(renderable.dark_color.b);
-                                        material.dark_color.set_a(renderable.dark_color.a);
                                         material.image = asset_server.load(texture_path.as_str());
                                     }
                                 } else {
@@ -626,11 +631,18 @@ fn empty_mesh(mesh: &mut Mesh) {
     let positions: Vec<[f32; 3]> = vec![];
     let normals: Vec<[f32; 3]> = vec![];
     let uvs: Vec<[f32; 2]> = vec![];
+    let colors: Vec<[f32; 4]> = vec![];
+    let dark_colors: Vec<[f32; 4]> = vec![];
 
     mesh.set_indices(Some(indices));
     mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, positions);
     mesh.insert_attribute(Mesh::ATTRIBUTE_NORMAL, normals);
     mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, uvs);
+    mesh.insert_attribute(Mesh::ATTRIBUTE_COLOR, colors);
+    mesh.insert_attribute(
+        MeshVertexAttribute::new("Vertex_DarkColor", 5, VertexFormat::Float32x4),
+        dark_colors,
+    );
 }
 
 mod assets;

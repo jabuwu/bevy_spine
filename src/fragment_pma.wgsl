@@ -13,18 +13,13 @@ struct VertexOutput {
     @location(0) world_position: vec4<f32>,
     @location(1) world_normal: vec3<f32>,
     @location(2) uv: vec2<f32>,
-};
-
-struct Material {
-    color: vec4<f32>,
-    dark_color: vec4<f32>,
+    @location(4) color: vec4<f32>,
+    @location(5) dark_color: vec4<f32>,
 };
 
 @group(1) @binding(0)
-var<uniform> material: Material;
-@group(1) @binding(1)
 var texture: texture_2d<f32>;
-@group(1) @binding(2)
+@group(1) @binding(1)
 var texture_sampler: sampler;
 
 fn linear_to_nonlinear(x: f32) -> f32 {
@@ -64,7 +59,7 @@ fn fragment(input: VertexOutput) -> @location(0) vec4<f32> {
     let s_non_premult = unpremultiply(s, a);
     let lin = vec3(nonlinear_to_linear(s_non_premult.r) * a, nonlinear_to_linear(s_non_premult.g) * a, nonlinear_to_linear(s_non_premult.b) * a);
     return vec4(
-        ((tex_color.a - 1.0) * material.dark_color.a + 1.0 - lin.rgb) * material.dark_color.rgb + lin.rgb * material.color.rgb,
-        tex_color.a * material.color.a,
+        ((tex_color.a - 1.0) * input.dark_color.a + 1.0 - lin.rgb) * input.dark_color.rgb + lin.rgb * input.color.rgb,
+        tex_color.a * input.color.a,
     );
 }
