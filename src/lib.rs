@@ -26,7 +26,7 @@ use rusty_spine::{BlendMode, Skeleton};
 
 use crate::{
     assets::{AtlasLoader, SkeletonJsonLoader},
-    rusty::{
+    rusty_spine::{
         draw::CullDirection, AnimationStateData, BoneHandle, EventType, SkeletonControllerSettings,
     },
     textures::SpineTextures,
@@ -35,9 +35,10 @@ use crate::{
 pub use assets::*;
 pub use crossfades::Crossfades;
 pub use entity_sync::*;
-pub use rusty_spine as rusty;
 pub use rusty_spine::SkeletonController;
 pub use textures::SpineTexture;
+
+pub use rusty_spine;
 
 #[derive(Debug, Hash, PartialEq, Eq, Clone, SystemLabel)]
 pub enum SpineSystem {
@@ -299,12 +300,14 @@ fn spine_load(
             if let Some(crossfades) = crossfades {
                 crossfades.apply(&mut animation_state_data);
             }
-            let controller = SkeletonController::new(skeleton_data, Arc::new(animation_state_data))
-                .with_settings(
-                    SkeletonControllerSettings::new()
-                        .with_cull_direction(CullDirection::CounterClockwise)
-                        .with_premultiplied_alpha(premultipled_alpha),
-                );
+            let mut controller =
+                SkeletonController::new(skeleton_data, Arc::new(animation_state_data))
+                    .with_settings(
+                        SkeletonControllerSettings::new()
+                            .with_cull_direction(CullDirection::CounterClockwise)
+                            .with_premultiplied_alpha(premultipled_alpha),
+                    );
+            controller.skeleton.set_to_setup_pose();
             let mut bones = HashMap::new();
             commands
                 .entity(entity)
@@ -350,6 +353,13 @@ fn spawn_bones(
     bones: &mut HashMap<String, Entity>,
 ) {
     if let Some(bone) = bone.get(skeleton) {
+        let mut transform = Transform::default();
+        transform.translation.x = bone.applied_x();
+        transform.translation.y = bone.applied_y();
+        transform.translation.z = 0.;
+        transform.rotation = Quat::from_axis_angle(Vec3::Z, bone.applied_rotation().to_radians());
+        transform.scale.x = bone.applied_scale_x();
+        transform.scale.y = bone.applied_scale_y();
         let bone_entity = parent
             .spawn_bundle(SpriteBundle {
                 sprite: Sprite {
@@ -357,7 +367,7 @@ fn spawn_bones(
                     color: Color::NONE,
                     ..Default::default()
                 },
-                transform: Transform::from_xyz(0., 0., 1.),
+                transform,
                 ..Default::default()
             })
             .insert(SpineBone {
@@ -629,7 +639,7 @@ fn empty_mesh(mesh: &mut Mesh) {
 mod assets;
 mod crossfades;
 mod entity_sync;
-mod materials;
 mod textures;
 
+pub mod materials;
 pub mod prelude;
