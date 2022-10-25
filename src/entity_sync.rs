@@ -1,7 +1,10 @@
 use std::marker::PhantomData;
 
 use bevy::{
-    ecs::{schedule::ParallelSystemDescriptor, system::BoxedSystem},
+    ecs::{
+        schedule::ParallelSystemDescriptor,
+        system::{AlreadyWasSystem, BoxedSystem, FunctionSystem, IsFunctionSystem, SystemParam},
+    },
     prelude::*,
 };
 
@@ -106,7 +109,22 @@ pub fn spine_sync_entities_applied<S: Component>(
     }
 }
 
-pub trait IntoSpineSystem<In, Out, Params>: bevy::prelude::IntoSystem<In, Out, Params> {}
+pub trait IntoSpineSystem<In, Out, Params>: bevy::prelude::IntoSystem<In, Out, Params> {
+    type System: System<In = In, Out = Out>;
+}
+impl<In, Out, Sys: System<In = In, Out = Out>> IntoSpineSystem<In, Out, AlreadyWasSystem> for Sys {
+    type System = Sys;
+}
+impl<In, Out, Param, Marker, F> IntoSpineSystem<In, Out, (IsFunctionSystem, Param, Marker)> for F
+where
+    In: 'static,
+    Out: 'static,
+    Param: SystemParam + 'static,
+    Marker: 'static,
+    F: SystemParamFunction<In, Out, Param, Marker> + Send + Sync + 'static,
+{
+    type System = FunctionSystem<In, Out, Param, Marker, F>;
+}
 
 pub trait SpineSystemFunctions<Params> {
     fn before_spine_sync<T: Component>(self) -> ParallelSystemDescriptor;
