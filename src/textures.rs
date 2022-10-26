@@ -9,14 +9,26 @@ use bevy::{
 };
 
 #[derive(Debug)]
-pub struct SpineTexture(pub String);
+pub(crate) struct SpineTexture(pub String);
 
 pub(crate) struct SpineTextures {
     data: Arc<Mutex<SpineTexturesData>>,
 }
 
+#[derive(Debug, Clone)]
+pub struct SpineTextureCreateEvent {
+    pub path: String,
+    pub handle: Handle<Image>,
+}
+
+#[derive(Debug, Clone)]
+pub struct SpineTextureDisposeEvent {
+    pub path: String,
+    pub handle: Handle<Image>,
+}
+
 #[derive(Default)]
-pub struct SpineTexturesData {
+pub(crate) struct SpineTexturesData {
     handles: Vec<(String, Handle<Image>)>,
     initialize: Vec<Handle<Image>>,
     remember: Vec<String>,
@@ -47,12 +59,22 @@ impl SpineTextures {
         Self { data }
     }
 
-    pub fn update(&self, asset_server: &AssetServer, images: &mut Assets<Image>) {
+    pub fn update(
+        &self,
+        asset_server: &AssetServer,
+        images: &mut Assets<Image>,
+        create_events: &mut EventWriter<SpineTextureCreateEvent>,
+        dispose_events: &mut EventWriter<SpineTextureDisposeEvent>,
+    ) {
         let mut data = self.data.lock().unwrap();
         while let Some(image) = data.remember.pop() {
             let handle = asset_server.load(&image);
             data.handles.push((image.clone(), handle.clone()));
-            data.initialize.push(handle);
+            data.initialize.push(handle.clone());
+            create_events.send(SpineTextureCreateEvent {
+                path: image,
+                handle,
+            });
         }
         while let Some(image) = data.forget.pop() {
             if let Some(index) = data.handles.iter().position(|i| i.0 == image) {
@@ -63,6 +85,10 @@ impl SpineTextures {
                 if let Some(initialize_position) = initialize_position {
                     data.initialize.remove(initialize_position);
                 }
+                dispose_events.send(SpineTextureDisposeEvent {
+                    path: image,
+                    handle: data.handles[index].1.clone(),
+                });
                 data.handles.remove(index);
             }
         }

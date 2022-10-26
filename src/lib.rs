@@ -29,14 +29,16 @@ use crate::{
     rusty_spine::{
         draw::CullDirection, AnimationStateData, BoneHandle, EventType, SkeletonControllerSettings,
     },
-    textures::SpineTextures,
+    textures::{SpineTexture, SpineTextures},
 };
 
-pub use assets::*;
-pub use crossfades::Crossfades;
-pub use entity_sync::*;
-pub use rusty_spine::SkeletonController;
-pub use textures::SpineTexture;
+pub use crate::{
+    assets::*,
+    crossfades::Crossfades,
+    entity_sync::*,
+    rusty_spine::SkeletonController,
+    textures::{SpineTextureCreateEvent, SpineTextureDisposeEvent},
+};
 
 pub use rusty_spine;
 
@@ -69,6 +71,8 @@ impl Plugin for SpinePlugin {
             .add_plugin(Material2dPlugin::<SpineScreenPmaMaterial>::default())
             .add_plugin(SpineSyncPlugin::default())
             .insert_resource(SpineTextures::init())
+            .add_event::<SpineTextureCreateEvent>()
+            .add_event::<SpineTextureDisposeEvent>()
             .add_asset::<Atlas>()
             .add_asset::<SkeletonJson>()
             .add_asset::<SkeletonBinary>()
@@ -157,13 +161,13 @@ pub struct SpineBundle {
     pub computed_visibility: ComputedVisibility,
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct SpineReadyEvent {
     pub entity: Entity,
     pub bones: HashMap<String, Entity>,
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub enum SpineEvent {
     Start { entity: Entity, animation: String },
     Interrupt { entity: Entity, animation: String },
@@ -193,6 +197,8 @@ fn spine_load(
     mut local: Local<SpineLoadLocal>,
     mut skeleton_data_assets: ResMut<Assets<SkeletonData>>,
     mut images: ResMut<Assets<Image>>,
+    mut texture_create_events: EventWriter<SpineTextureCreateEvent>,
+    mut texture_dispose_events: EventWriter<SpineTextureDisposeEvent>,
     atlases: Res<Assets<Atlas>>,
     jsons: Res<Assets<SkeletonJson>>,
     binaries: Res<Assets<SkeletonBinary>>,
@@ -347,7 +353,12 @@ fn spine_load(
         }
     }
 
-    spine_textures.update(asset_server.as_ref(), images.as_mut());
+    spine_textures.update(
+        asset_server.as_ref(),
+        images.as_mut(),
+        &mut texture_create_events,
+        &mut texture_dispose_events,
+    );
 }
 
 fn spawn_bones(
