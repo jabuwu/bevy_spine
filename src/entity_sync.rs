@@ -34,17 +34,17 @@ impl<T: Component> Default for SpineSynchronizerPlugin<T> {
 impl<T: Component> Plugin for SpineSynchronizerPlugin<T> {
     fn build(&self, app: &mut App) {
         app.add_system(
-            spine_sync_entities::<SpineSync>
+            spine_sync_entities::<T>
                 .label(SpineSynchronizerSystem::<T>::SyncEntities)
                 .after(SpineSystem::Update),
         )
         .add_system(
-            spine_sync_bones::<SpineSync>
+            spine_sync_bones::<T>
                 .label(SpineSynchronizerSystem::<T>::SyncBones)
                 .after(SpineSynchronizerSystem::<T>::SyncEntities),
         )
         .add_system(
-            spine_sync_entities_applied::<SpineSync>
+            spine_sync_entities_applied::<T>
                 .label(SpineSynchronizerSystem::<T>::SyncEntitiesApplied)
                 .after(SpineSynchronizerSystem::<T>::SyncBones)
                 .before(SpineSystem::Render),
