@@ -36,7 +36,7 @@ pub use crate::{
     assets::*,
     crossfades::Crossfades,
     entity_sync::*,
-    rusty_spine::SkeletonController,
+    rusty_spine::{SkeletonController, Color},
     textures::{SpineTextureCreateEvent, SpineTextureDisposeEvent},
 };
 
