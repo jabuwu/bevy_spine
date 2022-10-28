@@ -36,7 +36,7 @@ pub use crate::{
     assets::*,
     crossfades::Crossfades,
     entity_sync::*,
-    rusty_spine::{SkeletonController, Color},
+    rusty_spine::{Color, SkeletonController},
     textures::{SpineTextureCreateEvent, SpineTextureDisposeEvent},
 };
 
@@ -504,7 +504,8 @@ fn spine_render(
 ) {
     for (mut spine, spine_children) in spine_query.iter_mut() {
         let mut renderables = spine.0.combined_renderables();
-        for (renderable_index, child) in spine_children.iter().enumerate() {
+        let mut renderable_index = 0;
+        for child in spine_children.iter() {
             if let Ok((
                 mesh_entity,
                 mesh_handle,
@@ -631,6 +632,7 @@ fn spine_render(
                 } else {
                     empty_mesh(mesh);
                 }
+                renderable_index += 1;
             }
         }
     }
