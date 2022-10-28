@@ -1,6 +1,6 @@
 //! There's not much documentation yet. Check out
 //! [the examples](https://github.com/jabuwu/bevy_spine/tree/main/examples) and the
-//! [rusty_spine docs](https://docs.rs/rusty_spine/0.3.0)
+//! [rusty_spine docs](https://docs.rs/rusty_spine/0.4.0)
 
 use std::{
     collections::{HashMap, VecDeque},

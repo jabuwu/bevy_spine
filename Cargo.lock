@@ -714,7 +714,7 @@ dependencies = [
 
 [[package]]
 name = "bevy_spine"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "bevy",
  "bevy_egui",
@@ -2994,8 +2994,9 @@ dependencies = [
 
 [[package]]
 name = "rusty_spine"
-version = "0.3.1"
-source = "git+https://github.com/jabuwu/rusty_spine?rev=7c11eff271a36dfbbc1f9ff2a0381f727f6368f5#7c11eff271a36dfbbc1f9ff2a0381f727f6368f5"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "95425ff6b6a44d2ab8f1a925c7a75b2de37a289bd28df8db916f9968126fe286"
 dependencies = [
  "egui",
  "egui_extras",
