@@ -8,6 +8,8 @@ bevy = "0.8"
 bevy_spine = "0.3"
 ```
 
+[See online demos!](https://jabuwu.github.io/bevy_spine_demos/) ([source repo](https://github.com/jabuwu/bevy_spine_demos))
+
 ## Versions
 
 | bevy_spine  | rusty_spine | bevy | spine |
