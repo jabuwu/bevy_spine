@@ -33,7 +33,7 @@ pub struct Bullet {
 fn bullet_spawn(mut commands: Commands, mut bullet_spawn_events: EventReader<BulletSpawnEvent>) {
     for event in bullet_spawn_events.iter() {
         commands
-            .spawn_bundle(SpriteBundle {
+            .spawn(SpriteBundle {
                 sprite: Sprite {
                     color: Color::RED,
                     custom_size: Some(Vec2::ONE * 16.),

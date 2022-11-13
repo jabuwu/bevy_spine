@@ -83,7 +83,7 @@ pub struct ShootController {
 fn player_spawn(mut commands: Commands, mut player_spawn_events: EventReader<PlayerSpawnEvent>) {
     for event in player_spawn_events.iter() {
         commands
-            .spawn_bundle(SpineBundle {
+            .spawn(SpineBundle {
                 skeleton: event.skeleton.clone(),
                 transform: Transform::from_xyz(-300., -200., 0.).with_scale(Vec3::ONE * 0.25),
                 ..Default::default()

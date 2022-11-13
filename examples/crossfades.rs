@@ -27,7 +27,7 @@ fn setup(
     mut commands: Commands,
     mut skeletons: ResMut<Assets<SkeletonData>>,
 ) {
-    commands.spawn_bundle(Camera2dBundle::default());
+    commands.spawn(Camera2dBundle::default());
 
     let skeleton = SkeletonData::new_from_json(
         asset_server.load("spineboy/export/spineboy-pro.json"),
@@ -39,7 +39,7 @@ fn setup(
     crossfades.add("idle", "walk", 0.5);
     crossfades.add("walk", "idle", 0.5);
 
-    commands.spawn_bundle(SpineBundle {
+    commands.spawn(SpineBundle {
         skeleton: skeleton_handle.clone(),
         crossfades,
         transform: Transform::default()
@@ -72,7 +72,7 @@ fn crossfades(mut spine_query: Query<&mut Spine>, time: Res<Time>) {
             .animation()
             .name()
             .to_owned();
-        if time.time_since_startup().as_secs_f64() % 2. > 1. {
+        if time.elapsed_seconds() % 2. > 1. {
             if current_animation != "walk" {
                 let _ = spine.animation_state.set_animation_by_name(0, "walk", true);
             }

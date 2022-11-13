@@ -27,7 +27,8 @@ use rusty_spine::{BlendMode, Skeleton};
 use crate::{
     assets::{AtlasLoader, SkeletonJsonLoader},
     rusty_spine::{
-        draw::CullDirection, AnimationStateData, BoneHandle, EventType, SkeletonControllerSettings,
+        controller::SkeletonControllerSettings, draw::CullDirection, AnimationStateData,
+        BoneHandle, EventType,
     },
     textures::{SpineTexture, SpineTextures},
 };
@@ -36,7 +37,7 @@ pub use crate::{
     assets::*,
     crossfades::Crossfades,
     entity_sync::*,
-    rusty_spine::{Color, SkeletonController},
+    rusty_spine::{controller::SkeletonController, Color},
     textures::{SpineTextureCreateEvent, SpineTextureDisposeEvent},
 };
 
@@ -327,7 +328,7 @@ fn spine_load(
                         let mut mesh = Mesh::new(PrimitiveTopology::TriangleList);
                         empty_mesh(&mut mesh);
                         let mesh_handle = meshes.add(mesh);
-                        parent.spawn_bundle((
+                        parent.spawn((
                             SpineMesh,
                             Mesh2dHandle(mesh_handle.clone()),
                             Transform::from_xyz(0., 0., z),
@@ -377,7 +378,7 @@ fn spawn_bones(
         transform.scale.x = bone.applied_scale_x();
         transform.scale.y = bone.applied_scale_y();
         let bone_entity = parent
-            .spawn_bundle((
+            .spawn((
                 transform,
                 GlobalTransform::default(),
                 Visibility::default(),

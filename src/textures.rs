@@ -11,6 +11,7 @@ use bevy::{
 #[derive(Debug)]
 pub(crate) struct SpineTexture(pub String);
 
+#[derive(Resource)]
 pub(crate) struct SpineTextures {
     data: Arc<Mutex<SpineTexturesData>>,
 }

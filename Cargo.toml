@@ -1,6 +1,6 @@
 [package]
 name = "bevy_spine"
-version = "0.3.0"
+version = "0.4.0-dev"
 edition = "2021"
 description = "Spine plugin for Bevy utilizing rusty_spine"
 homepage = "https://github.com/jabuwu/bevy_spine"
@@ -12,15 +12,10 @@ exclude = [
 ]
 
 [dependencies]
-rusty_spine = { version = "0.4" }
-bevy = { version = "0.8", default-features = false, features = [ "render", "bevy_asset" ] }
-glam = { version = "0.21", features = ["mint"] }
+rusty_spine = { git = "https://github.com/jabuwu/rusty_spine", rev = "b7d4c103ea89e85a4e6eae7114eedd66f3b78d1a" }
+bevy = { version = "0.9", default-features = false, features = [ "render", "bevy_asset" ] }
+bevy_math = { version = "0.9", features = [ "mint" ] }
 
 [dev-dependencies]
-bevy_egui = "0.16"
-rfd = "0.10"
 lerp = "0.4"
-bevy = { version = "0.8", default-features = true }
-
-[features]
-egui_debugger = [ "rusty_spine/egui_debugger" ]
+bevy = { version = "0.9", default-features = true }

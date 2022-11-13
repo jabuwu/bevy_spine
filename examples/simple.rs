@@ -17,7 +17,7 @@ fn setup(
     mut commands: Commands,
     mut skeletons: ResMut<Assets<SkeletonData>>,
 ) {
-    commands.spawn_bundle(Camera2dBundle::default());
+    commands.spawn(Camera2dBundle::default());
 
     let skeleton = SkeletonData::new_from_json(
         asset_server.load("spineboy/export/spineboy-pro.json"),
@@ -25,7 +25,7 @@ fn setup(
     );
     let skeleton_handle = skeletons.add(skeleton);
 
-    commands.spawn_bundle(SpineBundle {
+    commands.spawn(SpineBundle {
         skeleton: skeleton_handle.clone(),
         transform: Transform::from_xyz(0., -200., 0.).with_scale(Vec3::ONE * 0.5),
         ..Default::default()

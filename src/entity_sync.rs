@@ -2,7 +2,7 @@ use std::marker::PhantomData;
 
 use bevy::{
     ecs::{
-        schedule::ParallelSystemDescriptor,
+        schedule::SystemDescriptor,
         system::{AlreadyWasSystem, BoxedSystem, FunctionSystem, IsFunctionSystem, SystemParam},
     },
     prelude::*,
@@ -127,21 +127,21 @@ where
 }
 
 pub trait SpineSystemFunctions<Params> {
-    fn before_spine_sync<T: Component>(self) -> ParallelSystemDescriptor;
-    fn during_spine_sync<T: Component>(self) -> ParallelSystemDescriptor;
-    fn after_spine_sync<T: Component>(self) -> ParallelSystemDescriptor;
+    fn before_spine_sync<T: Component>(self) -> SystemDescriptor;
+    fn during_spine_sync<T: Component>(self) -> SystemDescriptor;
+    fn after_spine_sync<T: Component>(self) -> SystemDescriptor;
 }
 
-impl SpineSystemFunctions<()> for ParallelSystemDescriptor {
-    fn before_spine_sync<T: Component>(self) -> ParallelSystemDescriptor {
+impl SpineSystemFunctions<()> for SystemDescriptor {
+    fn before_spine_sync<T: Component>(self) -> SystemDescriptor {
         self.after(SpineSystem::Update)
             .before(SpineSynchronizerSystem::<T>::SyncEntities)
     }
-    fn during_spine_sync<T: Component>(self) -> ParallelSystemDescriptor {
+    fn during_spine_sync<T: Component>(self) -> SystemDescriptor {
         self.after(SpineSynchronizerSystem::<T>::SyncEntities)
             .before(SpineSynchronizerSystem::<T>::SyncBones)
     }
-    fn after_spine_sync<T: Component>(self) -> ParallelSystemDescriptor {
+    fn after_spine_sync<T: Component>(self) -> SystemDescriptor {
         self.after(SpineSynchronizerSystem::<T>::SyncEntitiesApplied)
             .before(SpineSystem::Render)
     }
@@ -151,30 +151,30 @@ impl<S, Params> SpineSystemFunctions<Params> for S
 where
     S: IntoSpineSystem<(), (), Params>,
 {
-    fn before_spine_sync<T: Component>(self) -> ParallelSystemDescriptor {
+    fn before_spine_sync<T: Component>(self) -> SystemDescriptor {
         self.after(SpineSystem::Update)
             .before(SpineSynchronizerSystem::<T>::SyncEntities)
     }
-    fn during_spine_sync<T: Component>(self) -> ParallelSystemDescriptor {
+    fn during_spine_sync<T: Component>(self) -> SystemDescriptor {
         self.after(SpineSynchronizerSystem::<T>::SyncEntities)
             .before(SpineSynchronizerSystem::<T>::SyncBones)
     }
-    fn after_spine_sync<T: Component>(self) -> ParallelSystemDescriptor {
+    fn after_spine_sync<T: Component>(self) -> SystemDescriptor {
         self.after(SpineSynchronizerSystem::<T>::SyncEntitiesApplied)
             .before(SpineSystem::Render)
     }
 }
 
 impl SpineSystemFunctions<()> for BoxedSystem<(), ()> {
-    fn before_spine_sync<T: Component>(self) -> ParallelSystemDescriptor {
+    fn before_spine_sync<T: Component>(self) -> SystemDescriptor {
         self.after(SpineSystem::Update)
             .before(SpineSynchronizerSystem::<T>::SyncEntities)
     }
-    fn during_spine_sync<T: Component>(self) -> ParallelSystemDescriptor {
+    fn during_spine_sync<T: Component>(self) -> SystemDescriptor {
         self.after(SpineSynchronizerSystem::<T>::SyncEntities)
             .before(SpineSynchronizerSystem::<T>::SyncBones)
     }
-    fn after_spine_sync<T: Component>(self) -> ParallelSystemDescriptor {
+    fn after_spine_sync<T: Component>(self) -> SystemDescriptor {
         self.after(SpineSynchronizerSystem::<T>::SyncEntitiesApplied)
             .before(SpineSystem::Render)
     }
