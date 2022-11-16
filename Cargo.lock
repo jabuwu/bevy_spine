@@ -664,7 +664,7 @@ dependencies = [
 
 [[package]]
 name = "bevy_spine"
-version = "0.4.0-dev"
+version = "0.4.0"
 dependencies = [
  "bevy",
  "bevy_math",
@@ -2503,8 +2503,9 @@ dependencies = [
 
 [[package]]
 name = "rusty_spine"
-version = "0.5.0-dev"
-source = "git+https://github.com/jabuwu/rusty_spine?rev=b7d4c103ea89e85a4e6eae7114eedd66f3b78d1a#b7d4c103ea89e85a4e6eae7114eedd66f3b78d1a"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "57aba276259dfdc9c4dda73dc418e67829a47909cc4f94e946712684a35c0b63"
 dependencies = [
  "mint",
 ]
