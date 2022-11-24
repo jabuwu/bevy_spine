@@ -170,12 +170,35 @@ pub struct SpineReadyEvent {
 
 #[derive(Debug, Clone)]
 pub enum SpineEvent {
-    Start { entity: Entity, animation: String },
-    Interrupt { entity: Entity, animation: String },
-    End { entity: Entity, animation: String },
-    Complete { entity: Entity, animation: String },
-    Dispose { entity: Entity },
-    Event { entity: Entity, name: String },
+    Start {
+        entity: Entity,
+        animation: String,
+    },
+    Interrupt {
+        entity: Entity,
+        animation: String,
+    },
+    End {
+        entity: Entity,
+        animation: String,
+    },
+    Complete {
+        entity: Entity,
+        animation: String,
+    },
+    Dispose {
+        entity: Entity,
+    },
+    Event {
+        entity: Entity,
+        name: String,
+        int: i32,
+        float: f32,
+        string: String,
+        audio_path: String,
+        volume: f32,
+        balance: f32,
+    },
 }
 
 #[derive(Default)]
@@ -454,6 +477,12 @@ fn spine_update(
                             events.push_back(SpineEvent::Event {
                                 entity,
                                 name: spine_event.data().name().to_owned(),
+                                int: spine_event.int_value(),
+                                float: spine_event.float_value(),
+                                string: spine_event.string_value().to_owned(),
+                                audio_path: spine_event.data().audio_path().to_owned(),
+                                volume: spine_event.volume(),
+                                balance: spine_event.balance(),
                             });
                         }
                     }
