@@ -48,7 +48,7 @@ fn on_spawn(
     }
 }
 
-fn ik(mut spine_query: Query<&mut Spine>, windows: Res<Windows>) {
+fn ik(mut spine_query: Query<&mut Spine>, window_query: Query<&Window>) {
     for mut spine in spine_query.iter_mut() {
         let Spine(SkeletonController { skeleton, .. }) = spine.as_mut();
         skeleton.set_scale_x(0.5);
@@ -56,7 +56,7 @@ fn ik(mut spine_query: Query<&mut Spine>, windows: Res<Windows>) {
         skeleton.set_y(-200.);
         skeleton.set_x(-200.);
     }
-    let cursor_position = if let Some(cursor_position) = windows.primary().cursor_position() {
+    let cursor_position = if let Some(cursor_position) = window_query.single().cursor_position() {
         cursor_position
     } else {
         return;
@@ -73,8 +73,8 @@ fn ik(mut spine_query: Query<&mut Spine>, windows: Res<Windows>) {
         };
         let cursor_adjustment = cursor_position
             - Vec2::new(
-                windows.primary().width() * 0.5,
-                windows.primary().height() * 0.5,
+                window_query.single().width() * 0.5,
+                window_query.single().height() * 0.5,
             );
         let cursor = bone
             .parent()

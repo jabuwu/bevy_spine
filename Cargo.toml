@@ -13,9 +13,9 @@ exclude = [
 
 [dependencies]
 rusty_spine = { version = "0.5" }
-bevy = { version = "0.9", default-features = false, features = [ "render", "bevy_asset" ] }
-bevy_math = { version = "0.9", features = [ "mint" ] }
+bevy = { git = "https://github.com/bevyengine/bevy", rev = "978f7cd8bf9423961f663725cba18fb3ed75b46d", default-features = false, features = [ "bevy_render", "bevy_asset", "bevy_sprite" ] }
+bevy_math = { git = "https://github.com/bevyengine/bevy", rev = "978f7cd8bf9423961f663725cba18fb3ed75b46d", features = [ "mint" ] }
 
 [dev-dependencies]
 lerp = "0.4"
-bevy = { version = "0.9", default-features = true }
+bevy = { git = "https://github.com/bevyengine/bevy", rev = "978f7cd8bf9423961f663725cba18fb3ed75b46d", default-features = true }

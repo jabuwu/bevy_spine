@@ -43,7 +43,7 @@ pub use crate::{
 
 pub use rusty_spine;
 
-#[derive(Debug, Hash, PartialEq, Eq, Clone, SystemLabel)]
+#[derive(Debug, Hash, PartialEq, Eq, Clone, SystemSet)]
 pub enum SpineSystem {
     Load,
     Update,
@@ -83,13 +83,13 @@ impl Plugin for SpinePlugin {
             .init_asset_loader::<SkeletonBinaryLoader>()
             .add_event::<SpineReadyEvent>()
             .add_event::<SpineEvent>()
-            .add_system(spine_load.label(SpineSystem::Load))
+            .add_system(spine_load.in_set(SpineSystem::Load))
             .add_system(
                 spine_update
-                    .label(SpineSystem::Update)
+                    .in_set(SpineSystem::Update)
                     .after(SpineSystem::Load),
             )
-            .add_system(spine_render.label(SpineSystem::Render));
+            .add_system(spine_render.in_set(SpineSystem::Render));
     }
 }
 

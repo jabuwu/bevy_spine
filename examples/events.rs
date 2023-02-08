@@ -66,10 +66,7 @@ fn on_spine_event(
                             color: Color::WHITE,
                         },
                     )
-                    .with_alignment(TextAlignment {
-                        horizontal: HorizontalAlign::Center,
-                        vertical: VerticalAlign::Center,
-                    }),
+                    .with_alignment(TextAlignment::Center),
                     transform: Transform::from_xyz(0., -200., 1.),
                     ..Default::default()
                 })

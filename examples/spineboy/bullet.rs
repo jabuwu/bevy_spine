@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 
-#[derive(Debug, Hash, PartialEq, Eq, Clone, SystemLabel)]
+#[derive(Debug, Hash, PartialEq, Eq, Clone, SystemSet)]
 pub enum BulletSystem {
     Spawn,
     Update,
@@ -11,10 +11,10 @@ pub struct BulletPlugin;
 impl Plugin for BulletPlugin {
     fn build(&self, app: &mut App) {
         app.add_event::<BulletSpawnEvent>()
-            .add_system(bullet_spawn.label(BulletSystem::Spawn))
+            .add_system(bullet_spawn.in_set(BulletSystem::Spawn))
             .add_system(
                 bullet_update
-                    .label(BulletSystem::Update)
+                    .in_set(BulletSystem::Update)
                     .after(BulletSystem::Spawn),
             );
     }

@@ -11,7 +11,7 @@ const PLAYER_TRACK_JUMP: i32 = 2;
 const PLAYER_TRACK_AIM: i32 = 3;
 const PLAYER_TRACK_SHOOT: i32 = 4;
 
-#[derive(Debug, Hash, PartialEq, Eq, Clone, SystemLabel)]
+#[derive(Debug, Hash, PartialEq, Eq, Clone, SystemSet)]
 pub enum PlayerSystem {
     Spawn,
     SpineReady,
@@ -27,32 +27,32 @@ pub struct PlayerPlugin;
 impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
         app.add_event::<PlayerSpawnEvent>()
-            .add_system(player_spawn.label(PlayerSystem::Spawn))
-            .add_system(player_spine_ready.label(PlayerSystem::SpineReady))
+            .add_system(player_spawn.in_set(PlayerSystem::Spawn))
+            .add_system(player_spine_ready.in_set(PlayerSystem::SpineReady))
             .add_system(
                 player_spine_events
-                    .label(PlayerSystem::SpineEvents)
+                    .in_set(PlayerSystem::SpineEvents)
                     .before_spine_sync::<SpineSync>(),
             )
             .add_system(
                 player_aim
-                    .label(PlayerSystem::Aim)
+                    .in_set(PlayerSystem::Aim)
                     .during_spine_sync::<SpineSync>(),
             )
             .add_system(
                 player_shoot
-                    .label(PlayerSystem::Shoot)
+                    .in_set(PlayerSystem::Shoot)
                     .after_spine_sync::<SpineSync>()
                     .before(BulletSystem::Spawn),
             )
             .add_system(
                 player_move
-                    .label(PlayerSystem::Move)
+                    .in_set(PlayerSystem::Move)
                     .before_spine_sync::<SpineSync>(),
             )
             .add_system(
                 player_jump
-                    .label(PlayerSystem::Jump)
+                    .in_set(PlayerSystem::Jump)
                     .before_spine_sync::<SpineSync>(),
             );
     }
@@ -180,16 +180,16 @@ fn player_aim(
     bone_query: Query<(Entity, &Parent), With<SpineBone>>,
     mut transform_query: Query<&mut Transform>,
     global_transform_query: Query<&GlobalTransform>,
-    windows: Res<Windows>,
+    window_query: Query<&Window>,
     camera_query: Query<(Entity, &Camera)>,
     time: Res<Time>,
 ) {
-    let cursor_position = if let Some(cursor_position) = windows.primary().cursor_position() {
+    let cursor_position = if let Some(cursor_position) = window_query.single().cursor_position() {
         if let Ok((camera_entity, camera)) = camera_query.get_single() {
             if let Ok(camera_transform) = global_transform_query.get(camera_entity) {
                 let window_size = Vec2::new(
-                    windows.primary().width() as f32,
-                    windows.primary().height() as f32,
+                    window_query.single().width() as f32,
+                    window_query.single().height() as f32,
                 );
                 let ndc = (cursor_position / window_size) * 2.0 - Vec2::ONE;
                 let ndc_to_world =
