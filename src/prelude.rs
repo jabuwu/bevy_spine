@@ -1,5 +1,5 @@
 pub use crate::{
     SkeletonController, SkeletonData, Spine, SpineBone, SpineBundle, SpineEvent, SpineLoader,
-    SpinePlugin, SpineReadyEvent, SpineSync, SpineSyncSystem, SpineSystem, SpineSystemFunctions,
+    SpinePlugin, SpineReadyEvent, SpineSet, SpineSync, SpineSyncSystem, SpineSystemFunctions,
 };
 pub use rusty_spine::{BoneHandle, SlotHandle};

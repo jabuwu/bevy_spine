@@ -107,37 +107,46 @@ impl AssetLoader for SkeletonBinaryLoader {
 
 #[derive(Debug, TypeUuid)]
 #[uuid = "7796a37b-37a4-49ea-bf4e-fb7344aa6015"]
-pub enum SkeletonData {
-    BinaryFile {
-        atlas: Handle<Atlas>,
-        binary: Handle<SkeletonBinary>,
-        loader: Option<rusty_spine::SkeletonBinary>,
-        data: Option<Arc<rusty_spine::SkeletonData>>,
-    },
-    JsonFile {
-        atlas: Handle<Atlas>,
-        json: Handle<SkeletonJson>,
-        loader: Option<rusty_spine::SkeletonJson>,
-        data: Option<Arc<rusty_spine::SkeletonData>>,
-    },
+pub struct SkeletonData {
+    pub atlas_handle: Handle<Atlas>,
+    pub kind: SkeletonDataKind,
+    pub status: SkeletonDataStatus,
+    pub premultiplied_alpha: bool,
+}
+
+#[derive(Debug)]
+pub enum SkeletonDataKind {
+    BinaryFile(Handle<SkeletonBinary>),
+    JsonFile(Handle<SkeletonJson>),
+}
+
+#[derive(Debug)]
+pub enum SkeletonDataStatus {
+    Loaded(Arc<rusty_spine::SkeletonData>),
+    Loading,
+    Failed,
 }
 
 impl SkeletonData {
     pub fn new_from_json(json: Handle<SkeletonJson>, atlas: Handle<Atlas>) -> Self {
-        Self::JsonFile {
-            atlas,
-            json,
-            loader: None,
-            data: None,
+        Self {
+            atlas_handle: atlas,
+            kind: SkeletonDataKind::JsonFile(json),
+            status: SkeletonDataStatus::Loading,
+            premultiplied_alpha: false,
         }
     }
 
     pub fn new_from_binary(binary: Handle<SkeletonBinary>, atlas: Handle<Atlas>) -> Self {
-        Self::BinaryFile {
-            atlas,
-            binary,
-            loader: None,
-            data: None,
+        Self {
+            atlas_handle: atlas,
+            kind: SkeletonDataKind::BinaryFile(binary),
+            status: SkeletonDataStatus::Loading,
+            premultiplied_alpha: false,
         }
+    }
+
+    pub fn is_loaded(&self) -> bool {
+        matches!(&self.status, SkeletonDataStatus::Loaded(..))
     }
 }

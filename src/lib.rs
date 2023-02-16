@@ -44,8 +44,12 @@ pub use crate::{
 pub use rusty_spine;
 
 #[derive(Debug, Hash, PartialEq, Eq, Clone, SystemSet)]
-pub enum SpineSystem {
+pub enum SpineSet {
     Load,
+    LoadFlush,
+    Spawn,
+    SpawnFlush,
+    Ready,
     Update,
     Render,
 }
@@ -72,6 +76,7 @@ impl Plugin for SpinePlugin {
             .add_plugin(Material2dPlugin::<SpineScreenPmaMaterial>::default())
             .add_plugin(SpineSyncPlugin::default())
             .insert_resource(SpineTextures::init())
+            .insert_resource(SpineReadyEvents::default())
             .add_event::<SpineTextureCreateEvent>()
             .add_event::<SpineTextureDisposeEvent>()
             .add_asset::<Atlas>()
@@ -83,13 +88,23 @@ impl Plugin for SpinePlugin {
             .init_asset_loader::<SkeletonBinaryLoader>()
             .add_event::<SpineReadyEvent>()
             .add_event::<SpineEvent>()
-            .add_system(spine_load.in_set(SpineSystem::Load))
+            .add_system(spine_load.in_set(SpineSet::Load))
+            .add_system(spine_spawn.in_set(SpineSet::Spawn).after(SpineSet::Load))
+            .add_system(spine_ready.in_set(SpineSet::Ready).after(SpineSet::Spawn))
+            .add_system(spine_update.in_set(SpineSet::Update).after(SpineSet::Ready))
+            .add_system(spine_render.in_set(SpineSet::Render))
             .add_system(
-                spine_update
-                    .in_set(SpineSystem::Update)
-                    .after(SpineSystem::Load),
+                apply_system_buffers
+                    .in_set(SpineSet::LoadFlush)
+                    .after(SpineSet::Load)
+                    .before(SpineSet::Spawn),
             )
-            .add_system(spine_render.in_set(SpineSystem::Render));
+            .add_system(
+                apply_system_buffers
+                    .in_set(SpineSet::SpawnFlush)
+                    .after(SpineSet::Spawn)
+                    .before(SpineSet::Ready),
+            );
     }
 }
 
@@ -201,24 +216,11 @@ pub enum SpineEvent {
     },
 }
 
-#[derive(Default)]
-struct SpineLoadLocal {
-    // used for a one-frame delay in sending ready events
-    ready_events: Vec<SpineReadyEvent>,
-}
+#[derive(Default, Resource)]
+struct SpineReadyEvents(Vec<SpineReadyEvent>);
 
 #[allow(clippy::too_many_arguments)]
 fn spine_load(
-    mut skeleton_query: Query<(
-        &mut SpineLoader,
-        Entity,
-        &Handle<SkeletonData>,
-        Option<&Crossfades>,
-    )>,
-    mut commands: Commands,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut ready_events: EventWriter<SpineReadyEvent>,
-    mut local: Local<SpineLoadLocal>,
     mut skeleton_data_assets: ResMut<Assets<SkeletonData>>,
     mut images: ResMut<Assets<Image>>,
     mut texture_create_events: EventWriter<SpineTextureCreateEvent>,
@@ -229,151 +231,153 @@ fn spine_load(
     spine_textures: Res<SpineTextures>,
     asset_server: Res<AssetServer>,
 ) {
-    for event in local.ready_events.iter() {
-        ready_events.send(event.clone());
+    for (_, skeleton_data_asset) in skeleton_data_assets.iter_mut() {
+        let SkeletonData {
+            atlas_handle,
+            kind,
+            status,
+            premultiplied_alpha,
+        } = skeleton_data_asset;
+        if matches!(status, SkeletonDataStatus::Loading) {
+            let atlas = if let Some(atlas) = atlases.get(atlas_handle) {
+                atlas
+            } else {
+                continue;
+            };
+            if let Some(page) = atlas.atlas.pages().next() {
+                *premultiplied_alpha = page.pma();
+            }
+            match kind {
+                SkeletonDataKind::JsonFile(json_handle) => {
+                    let json = if let Some(json) = jsons.get(json_handle) {
+                        json
+                    } else {
+                        continue;
+                    };
+                    let skeleton_json = rusty_spine::SkeletonJson::new(atlas.atlas.clone());
+                    match skeleton_json.read_skeleton_data(&json.json) {
+                        Ok(skeleton_data) => {
+                            *status = SkeletonDataStatus::Loaded(Arc::new(skeleton_data));
+                        }
+                        Err(_err) => {
+                            *status = SkeletonDataStatus::Failed;
+                            continue;
+                        }
+                    }
+                }
+                SkeletonDataKind::BinaryFile(binary_handle) => {
+                    let binary = if let Some(binary) = binaries.get(binary_handle) {
+                        binary
+                    } else {
+                        continue;
+                    };
+                    let skeleton_binary = rusty_spine::SkeletonBinary::new(atlas.atlas.clone());
+                    match skeleton_binary.read_skeleton_data(&binary.binary) {
+                        Ok(skeleton_data) => {
+                            *status = SkeletonDataStatus::Loaded(Arc::new(skeleton_data));
+                        }
+                        Err(_err) => {
+                            // TODO: print error?
+                            *status = SkeletonDataStatus::Failed;
+                            continue;
+                        }
+                    }
+                }
+            }
+        }
     }
-    local.ready_events = vec![];
+
+    spine_textures.update(
+        asset_server.as_ref(),
+        images.as_mut(),
+        &mut texture_create_events,
+        &mut texture_dispose_events,
+    );
+}
+
+#[allow(clippy::too_many_arguments)]
+fn spine_spawn(
+    mut skeleton_query: Query<(
+        &mut SpineLoader,
+        Entity,
+        &Handle<SkeletonData>,
+        Option<&Crossfades>,
+    )>,
+    mut commands: Commands,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut ready_events: ResMut<SpineReadyEvents>,
+    mut skeleton_data_assets: ResMut<Assets<SkeletonData>>,
+    mut images: ResMut<Assets<Image>>,
+    mut texture_create_events: EventWriter<SpineTextureCreateEvent>,
+    mut texture_dispose_events: EventWriter<SpineTextureDisposeEvent>,
+    spine_textures: Res<SpineTextures>,
+    asset_server: Res<AssetServer>,
+) {
     for (mut spine_loader, entity, data_handle, crossfades) in skeleton_query.iter_mut() {
         if let SpineLoader::Loading { with_children } = spine_loader.as_ref() {
-            let mut skeleton_data_asset =
+            let skeleton_data_asset =
                 if let Some(skeleton_data_asset) = skeleton_data_assets.get_mut(data_handle) {
                     skeleton_data_asset
                 } else {
                     continue;
                 };
-
-            let mut premultipled_alpha = false;
-            let skeleton_data = match &mut skeleton_data_asset {
-                SkeletonData::JsonFile {
-                    atlas,
-                    json,
-                    loader,
-                    data,
-                } => {
-                    let atlas = if let Some(atlas) = atlases.get(atlas) {
-                        atlas
-                    } else {
-                        continue;
-                    };
-                    if let Some(page) = atlas.atlas.pages().next() {
-                        premultipled_alpha = page.pma();
+            match &skeleton_data_asset.status {
+                SkeletonDataStatus::Loaded(skeleton_data) => {
+                    let mut animation_state_data = AnimationStateData::new(skeleton_data.clone());
+                    if let Some(crossfades) = crossfades {
+                        crossfades.apply(&mut animation_state_data);
                     }
-                    let json = if let Some(json) = jsons.get(json) {
-                        json
-                    } else {
-                        continue;
-                    };
-                    let skeleton_json = if let Some(loader) = &loader {
-                        loader
-                    } else {
-                        *loader = Some(rusty_spine::SkeletonJson::new(atlas.atlas.clone()));
-                        loader.as_ref().unwrap()
-                    };
-                    if let Some(skeleton_data) = &data {
-                        skeleton_data.clone()
-                    } else {
-                        match skeleton_json.read_skeleton_data(&json.json) {
-                            Ok(skeleton_data) => {
-                                *data = Some(Arc::new(skeleton_data));
-                                data.as_ref().unwrap().clone()
-                            }
-                            Err(_err) => {
-                                // TODO: print error?
-                                *spine_loader = SpineLoader::Failed;
-                                continue;
-                            }
-                        }
-                    }
-                }
-                SkeletonData::BinaryFile {
-                    atlas,
-                    binary,
-                    loader,
-                    data,
-                } => {
-                    let atlas = if let Some(atlas) = atlases.get(atlas) {
-                        atlas
-                    } else {
-                        continue;
-                    };
-                    if let Some(page) = atlas.atlas.pages().next() {
-                        premultipled_alpha = page.pma();
-                    }
-                    let binary = if let Some(binary) = binaries.get(binary) {
-                        binary
-                    } else {
-                        continue;
-                    };
-                    let skeleton_binary = if let Some(loader) = &loader {
-                        loader
-                    } else {
-                        *loader = Some(rusty_spine::SkeletonBinary::new(atlas.atlas.clone()));
-                        loader.as_ref().unwrap()
-                    };
-                    if let Some(skeleton_data) = &data {
-                        skeleton_data.clone()
-                    } else {
-                        match skeleton_binary.read_skeleton_data(&binary.binary) {
-                            Ok(skeleton_data) => {
-                                *data = Some(Arc::new(skeleton_data));
-                                data.as_ref().unwrap().clone()
-                            }
-                            Err(_err) => {
-                                // TODO: print error?
-                                *spine_loader = SpineLoader::Failed;
-                                continue;
-                            }
-                        }
-                    }
-                }
-            };
-            let mut animation_state_data = AnimationStateData::new(skeleton_data.clone());
-            if let Some(crossfades) = crossfades {
-                crossfades.apply(&mut animation_state_data);
-            }
-            let mut controller =
-                SkeletonController::new(skeleton_data, Arc::new(animation_state_data))
+                    let mut controller = SkeletonController::new(
+                        skeleton_data.clone(),
+                        Arc::new(animation_state_data),
+                    )
                     .with_settings(
                         SkeletonControllerSettings::new()
                             .with_cull_direction(CullDirection::CounterClockwise)
-                            .with_premultiplied_alpha(premultipled_alpha),
+                            .with_premultiplied_alpha(skeleton_data_asset.premultiplied_alpha),
                     );
-            controller.skeleton.set_to_setup_pose();
-            let mut bones = HashMap::new();
-            commands
-                .entity(entity)
-                .with_children(|parent| {
-                    // TODO: currently, a mesh is created for each slot, however since we use the
-                    // combined drawer, this many meshes is usually not necessary. instead, we
-                    // may want to dynamically create meshes as needed in the render system
-                    let mut z = 0.;
-                    for _ in controller.skeleton.slots() {
-                        let mut mesh = Mesh::new(PrimitiveTopology::TriangleList);
-                        empty_mesh(&mut mesh);
-                        let mesh_handle = meshes.add(mesh);
-                        parent.spawn((
-                            SpineMesh,
-                            Mesh2dHandle(mesh_handle.clone()),
-                            Transform::from_xyz(0., 0., z),
-                            GlobalTransform::default(),
-                            Visibility::default(),
-                            ComputedVisibility::default(),
-                        ));
-                        z += EPSILON;
-                    }
-                    if *with_children {
-                        spawn_bones(
-                            entity,
-                            parent,
-                            &controller.skeleton,
-                            controller.skeleton.bone_root().handle(),
-                            &mut bones,
-                        );
-                    }
-                })
-                .insert(Spine(controller));
-            *spine_loader = SpineLoader::Ready;
-            local.ready_events.push(SpineReadyEvent { entity, bones });
+                    controller.skeleton.set_to_setup_pose();
+                    let mut bones = HashMap::new();
+                    commands
+                        .entity(entity)
+                        .with_children(|parent| {
+                            // TODO: currently, a mesh is created for each slot, however since we use the
+                            // combined drawer, this many meshes is usually not necessary. instead, we
+                            // may want to dynamically create meshes as needed in the render system
+                            let mut z = 0.;
+                            for _ in controller.skeleton.slots() {
+                                let mut mesh = Mesh::new(PrimitiveTopology::TriangleList);
+                                empty_mesh(&mut mesh);
+                                let mesh_handle = meshes.add(mesh);
+                                parent.spawn((
+                                    SpineMesh,
+                                    Mesh2dHandle(mesh_handle.clone()),
+                                    Transform::from_xyz(0., 0., z),
+                                    GlobalTransform::default(),
+                                    Visibility::default(),
+                                    ComputedVisibility::default(),
+                                ));
+                                z += EPSILON;
+                            }
+                            if *with_children {
+                                spawn_bones(
+                                    entity,
+                                    parent,
+                                    &controller.skeleton,
+                                    controller.skeleton.bone_root().handle(),
+                                    &mut bones,
+                                );
+                            }
+                        })
+                        .insert(Spine(controller));
+                    *spine_loader = SpineLoader::Ready;
+                    ready_events.0.push(SpineReadyEvent { entity, bones });
+                }
+                SkeletonDataStatus::Loading => {}
+                SkeletonDataStatus::Failed => {
+                    *spine_loader = SpineLoader::Failed;
+                }
+            }
         }
     }
 
@@ -419,6 +423,15 @@ fn spawn_bones(
             })
             .id();
         bones.insert(bone.data().name().to_owned(), bone_entity);
+    }
+}
+
+fn spine_ready(
+    mut ready_events: ResMut<SpineReadyEvents>,
+    mut ready_writer: EventWriter<SpineReadyEvent>,
+) {
+    for event in take(&mut ready_events.0).into_iter() {
+        ready_writer.send(event);
     }
 }
 
