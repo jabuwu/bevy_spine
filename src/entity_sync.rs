@@ -14,7 +14,7 @@ pub trait SpineSynchronizer: Component + Clone + Eq + Debug + Hash {}
 impl<T> SpineSynchronizer for T where T: Component + Clone + Eq + Debug + Hash {}
 
 #[derive(Hash, Debug, PartialEq, Eq, Clone, SystemSet)]
-pub enum SpineSynchronizerSystem<T: SpineSynchronizer> {
+pub enum SpineSynchronizerSet<T: SpineSynchronizer> {
     SyncEntities,
     SyncBones,
     SyncEntitiesApplied,
@@ -38,18 +38,18 @@ impl<T: SpineSynchronizer> Plugin for SpineSynchronizerPlugin<T> {
     fn build(&self, app: &mut App) {
         app.add_system(
             spine_sync_entities::<T>
-                .in_set(SpineSynchronizerSystem::<T>::SyncEntities)
+                .in_set(SpineSynchronizerSet::<T>::SyncEntities)
                 .after(SpineSet::Update),
         )
         .add_system(
             spine_sync_bones::<T>
-                .in_set(SpineSynchronizerSystem::<T>::SyncBones)
-                .after(SpineSynchronizerSystem::<T>::SyncEntities),
+                .in_set(SpineSynchronizerSet::<T>::SyncBones)
+                .after(SpineSynchronizerSet::<T>::SyncEntities),
         )
         .add_system(
             spine_sync_entities_applied::<T>
-                .in_set(SpineSynchronizerSystem::<T>::SyncEntitiesApplied)
-                .after(SpineSynchronizerSystem::<T>::SyncBones)
+                .in_set(SpineSynchronizerSet::<T>::SyncEntitiesApplied)
+                .after(SpineSynchronizerSet::<T>::SyncBones)
                 .before(SpineSet::Render),
         );
     }
@@ -138,14 +138,14 @@ pub trait SpineSystemFunctions<Params> {
 impl SpineSystemFunctions<()> for SystemConfig {
     fn before_spine_sync<T: SpineSynchronizer>(self) -> SystemConfig {
         self.after(SpineSet::Update)
-            .before(SpineSynchronizerSystem::<T>::SyncEntities)
+            .before(SpineSynchronizerSet::<T>::SyncEntities)
     }
     fn during_spine_sync<T: SpineSynchronizer>(self) -> SystemConfig {
-        self.after(SpineSynchronizerSystem::<T>::SyncEntities)
-            .before(SpineSynchronizerSystem::<T>::SyncBones)
+        self.after(SpineSynchronizerSet::<T>::SyncEntities)
+            .before(SpineSynchronizerSet::<T>::SyncBones)
     }
     fn after_spine_sync<T: SpineSynchronizer>(self) -> SystemConfig {
-        self.after(SpineSynchronizerSystem::<T>::SyncEntitiesApplied)
+        self.after(SpineSynchronizerSet::<T>::SyncEntitiesApplied)
             .before(SpineSet::Render)
     }
 }
@@ -156,14 +156,14 @@ where
 {
     fn before_spine_sync<T: SpineSynchronizer>(self) -> SystemConfig {
         self.after(SpineSet::Update)
-            .before(SpineSynchronizerSystem::<T>::SyncEntities)
+            .before(SpineSynchronizerSet::<T>::SyncEntities)
     }
     fn during_spine_sync<T: SpineSynchronizer>(self) -> SystemConfig {
-        self.after(SpineSynchronizerSystem::<T>::SyncEntities)
-            .before(SpineSynchronizerSystem::<T>::SyncBones)
+        self.after(SpineSynchronizerSet::<T>::SyncEntities)
+            .before(SpineSynchronizerSet::<T>::SyncBones)
     }
     fn after_spine_sync<T: SpineSynchronizer>(self) -> SystemConfig {
-        self.after(SpineSynchronizerSystem::<T>::SyncEntitiesApplied)
+        self.after(SpineSynchronizerSet::<T>::SyncEntitiesApplied)
             .before(SpineSet::Render)
     }
 }
@@ -171,14 +171,14 @@ where
 impl SpineSystemFunctions<()> for BoxedSystem<(), ()> {
     fn before_spine_sync<T: SpineSynchronizer>(self) -> SystemConfig {
         self.after(SpineSet::Update)
-            .before(SpineSynchronizerSystem::<T>::SyncEntities)
+            .before(SpineSynchronizerSet::<T>::SyncEntities)
     }
     fn during_spine_sync<T: SpineSynchronizer>(self) -> SystemConfig {
-        self.after(SpineSynchronizerSystem::<T>::SyncEntities)
-            .before(SpineSynchronizerSystem::<T>::SyncBones)
+        self.after(SpineSynchronizerSet::<T>::SyncEntities)
+            .before(SpineSynchronizerSet::<T>::SyncBones)
     }
     fn after_spine_sync<T: SpineSynchronizer>(self) -> SystemConfig {
-        self.after(SpineSynchronizerSystem::<T>::SyncEntitiesApplied)
+        self.after(SpineSynchronizerSet::<T>::SyncEntitiesApplied)
             .before(SpineSet::Render)
     }
 }
@@ -186,5 +186,5 @@ impl SpineSystemFunctions<()> for BoxedSystem<(), ()> {
 #[derive(Component, Debug, Hash, Clone, PartialEq, Eq)]
 pub struct SpineSync;
 
-pub type SpineSyncSystem = SpineSynchronizerSystem<SpineSync>;
+pub type SpineSyncSet = SpineSynchronizerSet<SpineSync>;
 pub type SpineSyncPlugin = SpineSynchronizerPlugin<SpineSync>;
