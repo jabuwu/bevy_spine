@@ -128,7 +128,6 @@ pub fn spine_sync_entities<S: SpineSynchronizer>(
     mut bone_query: Query<(&mut Transform, &SpineBone)>,
     spine_query: Query<&Spine, With<S>>,
 ) {
-    println!("spine_sync_entities");
     for (mut bone_transform, bone) in bone_query.iter_mut() {
         if let Ok(spine) = spine_query.get(bone.spine_entity) {
             if let Some(bone) = bone.handle.get(&spine.skeleton) {
@@ -147,7 +146,6 @@ pub fn spine_sync_bones<S: SpineSynchronizer>(
     mut bone_query: Query<(&mut Transform, &SpineBone)>,
     mut spine_query: Query<&mut Spine, With<S>>,
 ) {
-    println!("spine_sync_bones");
     for (bone_transform, bone) in bone_query.iter_mut() {
         if let Ok(mut spine) = spine_query.get_mut(bone.spine_entity) {
             if let Some(mut bone) = bone.handle.get_mut(&mut spine.skeleton) {
@@ -169,7 +167,6 @@ pub fn spine_sync_entities_applied<S: SpineSynchronizer>(
     mut bone_query: Query<(&mut Transform, &SpineBone)>,
     spine_query: Query<&Spine, With<S>>,
 ) {
-    println!("spine_sync_entities_applied");
     for (mut bone_transform, bone) in bone_query.iter_mut() {
         if let Ok(spine) = spine_query.get(bone.spine_entity) {
             if let Some(bone) = bone.handle.get(&spine.skeleton) {
