@@ -783,3 +783,6 @@ mod entity_sync;
 pub mod materials;
 pub mod prelude;
 pub mod textures;
+
+#[cfg(test)]
+mod test;
