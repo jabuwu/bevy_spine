@@ -32,28 +32,28 @@ impl Plugin for PlayerPlugin {
             .add_system(
                 player_spine_events
                     .in_set(PlayerSystem::SpineEvents)
-                    .before_spine_sync::<SpineSync>(),
+                    .in_set(SpineSyncSet::BeforeSync),
             )
             .add_system(
                 player_aim
                     .in_set(PlayerSystem::Aim)
-                    .during_spine_sync::<SpineSync>(),
+                    .in_set(SpineSyncSet::DuringSync),
             )
             .add_system(
                 player_shoot
                     .in_set(PlayerSystem::Shoot)
-                    .after_spine_sync::<SpineSync>()
+                    .in_set(SpineSyncSet::AfterSync)
                     .before(BulletSystem::Spawn),
             )
             .add_system(
                 player_move
                     .in_set(PlayerSystem::Move)
-                    .before_spine_sync::<SpineSync>(),
+                    .in_set(SpineSyncSet::BeforeSync),
             )
             .add_system(
                 player_jump
                     .in_set(PlayerSystem::Jump)
-                    .before_spine_sync::<SpineSync>(),
+                    .in_set(SpineSyncSet::BeforeSync),
             );
     }
 }

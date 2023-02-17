@@ -1,25 +1,22 @@
 use std::{fmt::Debug, hash::Hash, marker::PhantomData};
 
-use bevy::{
-    ecs::{
-        schedule::SystemConfig,
-        system::{AlreadyWasSystem, BoxedSystem, FunctionSystem, IsFunctionSystem, SystemParam},
-    },
-    prelude::*,
-};
+use bevy::prelude::*;
 
 use crate::{Spine, SpineBone, SpineSet};
 
 pub trait SpineSynchronizer: Component + Clone + Eq + Debug + Hash {}
 impl<T> SpineSynchronizer for T where T: Component + Clone + Eq + Debug + Hash {}
 
-#[derive(Hash, Debug, PartialEq, Eq, Clone, SystemSet)]
+#[derive(Hash, Debug, PartialEq, Eq, Clone, Copy, SystemSet)]
 pub enum SpineSynchronizerSet<T: SpineSynchronizer> {
+    BeforeSync,
     SyncEntities,
+    DuringSync,
     SyncBones,
     SyncEntitiesApplied,
+    AfterSync,
     #[system_set(ignore_fields)]
-    _Data(T),
+    _Data(PhantomData<T>),
 }
 
 pub struct SpineSynchronizerPlugin<T: SpineSynchronizer> {
@@ -39,17 +36,21 @@ impl<T: SpineSynchronizer> Plugin for SpineSynchronizerPlugin<T> {
         app.add_system(
             spine_sync_entities::<T>
                 .in_set(SpineSynchronizerSet::<T>::SyncEntities)
-                .after(SpineSet::Update),
+                .after(SpineSet::Update)
+                .after(SpineSynchronizerSet::<T>::BeforeSync)
+                .before(SpineSynchronizerSet::<T>::DuringSync),
         )
         .add_system(
             spine_sync_bones::<T>
                 .in_set(SpineSynchronizerSet::<T>::SyncBones)
-                .after(SpineSynchronizerSet::<T>::SyncEntities),
+                .after(SpineSynchronizerSet::<T>::SyncEntities)
+                .after(SpineSynchronizerSet::<T>::DuringSync),
         )
         .add_system(
             spine_sync_entities_applied::<T>
                 .in_set(SpineSynchronizerSet::<T>::SyncEntitiesApplied)
                 .after(SpineSynchronizerSet::<T>::SyncBones)
+                .before(SpineSynchronizerSet::<T>::AfterSync)
                 .before(SpineSet::Render),
         );
     }
@@ -109,77 +110,6 @@ pub fn spine_sync_entities_applied<S: SpineSynchronizer>(
                 bone_transform.scale.y = bone.applied_scale_y();
             }
         }
-    }
-}
-
-pub trait IntoSpineSystem<In, Out, Params>: bevy::prelude::IntoSystem<In, Out, Params> {
-    type System: System<In = In, Out = Out>;
-}
-impl<In, Out, Sys: System<In = In, Out = Out>> IntoSpineSystem<In, Out, AlreadyWasSystem> for Sys {
-    type System = Sys;
-}
-impl<In, Out, Param, Marker, F> IntoSpineSystem<In, Out, (IsFunctionSystem, Param, Marker)> for F
-where
-    In: 'static,
-    Out: 'static,
-    Param: SystemParam + 'static,
-    Marker: 'static,
-    F: SystemParamFunction<In, Out, Param, Marker> + Send + Sync + 'static,
-{
-    type System = FunctionSystem<In, Out, Param, Marker, F>;
-}
-
-pub trait SpineSystemFunctions<Params> {
-    fn before_spine_sync<T: SpineSynchronizer>(self) -> SystemConfig;
-    fn during_spine_sync<T: SpineSynchronizer>(self) -> SystemConfig;
-    fn after_spine_sync<T: SpineSynchronizer>(self) -> SystemConfig;
-}
-
-impl SpineSystemFunctions<()> for SystemConfig {
-    fn before_spine_sync<T: SpineSynchronizer>(self) -> SystemConfig {
-        self.after(SpineSet::Update)
-            .before(SpineSynchronizerSet::<T>::SyncEntities)
-    }
-    fn during_spine_sync<T: SpineSynchronizer>(self) -> SystemConfig {
-        self.after(SpineSynchronizerSet::<T>::SyncEntities)
-            .before(SpineSynchronizerSet::<T>::SyncBones)
-    }
-    fn after_spine_sync<T: SpineSynchronizer>(self) -> SystemConfig {
-        self.after(SpineSynchronizerSet::<T>::SyncEntitiesApplied)
-            .before(SpineSet::Render)
-    }
-}
-
-impl<S, Params> SpineSystemFunctions<Params> for S
-where
-    S: IntoSpineSystem<(), (), Params>,
-{
-    fn before_spine_sync<T: SpineSynchronizer>(self) -> SystemConfig {
-        self.after(SpineSet::Update)
-            .before(SpineSynchronizerSet::<T>::SyncEntities)
-    }
-    fn during_spine_sync<T: SpineSynchronizer>(self) -> SystemConfig {
-        self.after(SpineSynchronizerSet::<T>::SyncEntities)
-            .before(SpineSynchronizerSet::<T>::SyncBones)
-    }
-    fn after_spine_sync<T: SpineSynchronizer>(self) -> SystemConfig {
-        self.after(SpineSynchronizerSet::<T>::SyncEntitiesApplied)
-            .before(SpineSet::Render)
-    }
-}
-
-impl SpineSystemFunctions<()> for BoxedSystem<(), ()> {
-    fn before_spine_sync<T: SpineSynchronizer>(self) -> SystemConfig {
-        self.after(SpineSet::Update)
-            .before(SpineSynchronizerSet::<T>::SyncEntities)
-    }
-    fn during_spine_sync<T: SpineSynchronizer>(self) -> SystemConfig {
-        self.after(SpineSynchronizerSet::<T>::SyncEntities)
-            .before(SpineSynchronizerSet::<T>::SyncBones)
-    }
-    fn after_spine_sync<T: SpineSynchronizer>(self) -> SystemConfig {
-        self.after(SpineSynchronizerSet::<T>::SyncEntitiesApplied)
-            .before(SpineSet::Render)
     }
 }
 
