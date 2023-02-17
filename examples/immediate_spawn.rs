@@ -3,15 +3,25 @@
 use bevy::{app::AppExit, prelude::*};
 use bevy_spine::{SkeletonData, Spine, SpineBundle, SpinePlugin, SpineReadyEvent, SpineSet};
 
+#[derive(Debug, Hash, PartialEq, Eq, Clone, SystemSet)]
+pub enum ExampleSet {
+    Spawn,
+}
+
 fn main() {
     App::new()
         .add_plugins(DefaultPlugins)
         .add_plugin(SpinePlugin)
         .init_resource::<DemoData>()
         .add_startup_system(setup)
-        .add_system(spawn.after(SpineSet::Load).before(SpineSet::LoadFlush))
+        .add_system(spawn.in_set(ExampleSet::Spawn).after(SpineSet::Load))
         .add_system(on_spawn.after(SpineSet::Ready).before(SpineSet::Update))
         .add_system(frame_count.in_base_set(CoreSet::First))
+        .add_system(
+            apply_system_buffers
+                .after(ExampleSet::Spawn)
+                .before(SpineSet::Spawn),
+        )
         .run();
 }
 

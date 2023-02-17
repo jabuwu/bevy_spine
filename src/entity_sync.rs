@@ -4,6 +4,9 @@ use bevy::prelude::*;
 
 use crate::{Spine, SpineBone, SpineSet};
 
+#[cfg(doc)]
+use crate::SpinePlugin;
+
 pub trait SpineSynchronizer: Component + Clone + Eq + Debug + Hash {}
 impl<T> SpineSynchronizer for T where T: Component + Clone + Eq + Debug + Hash {}
 
@@ -19,24 +22,89 @@ pub enum SpineSynchronizerSet<T: SpineSynchronizer> {
     _Data(PhantomData<T>),
 }
 
-pub struct SpineSynchronizerPlugin<T: SpineSynchronizer> {
+/// A plugin for synchronizing [`SpineBone`] components with a rig.
+///
+/// This plugin is added automatically in [`SpinePlugin`] for [`SpineSync`] and does not need to be
+/// added manually. However, custom synchronization steps can be added to allow for multiple syncs
+/// in a single frame.
+///
+/// ```
+/// # use bevy::prelude::*;
+/// use bevy_spine::{prelude::*, SpineSynchronizerSet, SpineSynchronizerPlugin};
+///
+/// #[derive(Component, Debug, Hash, Clone, Copy, PartialEq, Eq)]
+/// pub struct MySpineSync;
+/// pub type MySpineSyncSet = SpineSynchronizerSet<MySpineSync>;
+/// pub type MySpineSyncPlugin = SpineSynchronizerPlugin<MySpineSync, SpineSyncSet>; // add after SpineSync
+///
+/// # fn doc() {
+/// fn main() {
+///     App::new()
+///         .add_plugins(DefaultPlugins)
+///         .add_plugin(SpinePlugin)
+///         .add_plugin(MySpineSyncPlugin::default())
+///         .add_system(spawn)
+///         .add_system(during_sync.in_set(SpineSyncSet::DuringSync))
+///         .add_system(during_my_sync.in_set(MySpineSyncSet::DuringSync))
+///         // ...
+///         .run();
+/// }
+/// # }
+///
+/// fn spawn(mut commands: Commands) {
+///     // .. load spine ..
+///     commands.spawn((
+///         SpineBundle {
+///             // ..
+///             ..Default::default()
+///         },
+///         // synchronize in both steps
+///         SpineSync,
+///         MySpineSync,
+///     ));
+/// }
+///
+/// fn during_sync() {
+///     // runs first
+/// }
+///
+/// fn during_my_sync() {
+///     // runs second
+/// }
+/// ```
+pub struct SpineSynchronizerPlugin<T: SpineSynchronizer, After: SystemSet + Copy> {
+    after: After,
     _marker: PhantomData<T>,
 }
 
-impl<T: SpineSynchronizer> Default for SpineSynchronizerPlugin<T> {
+impl<T: SpineSynchronizer, S: SpineSynchronizer> Default
+    for SpineSynchronizerPlugin<T, SpineSynchronizerSet<S>>
+where
+    SpineSynchronizerSet<S>: Copy,
+{
     fn default() -> Self {
         Self {
+            after: SpineSynchronizerSet::<S>::AfterSync,
             _marker: Default::default(),
         }
     }
 }
 
-impl<T: SpineSynchronizer> Plugin for SpineSynchronizerPlugin<T> {
+impl<T: SpineSynchronizer> SpineSynchronizerPlugin<T, SpineSet> {
+    pub(crate) fn first() -> Self {
+        Self {
+            after: SpineSet::Update,
+            _marker: Default::default(),
+        }
+    }
+}
+
+impl<T: SpineSynchronizer, A: SystemSet + Copy> Plugin for SpineSynchronizerPlugin<T, A> {
     fn build(&self, app: &mut App) {
         app.add_system(
             spine_sync_entities::<T>
                 .in_set(SpineSynchronizerSet::<T>::SyncEntities)
-                .after(SpineSet::Update)
+                .after(self.after)
                 .after(SpineSynchronizerSet::<T>::BeforeSync)
                 .before(SpineSynchronizerSet::<T>::DuringSync),
         )
@@ -60,6 +128,7 @@ pub fn spine_sync_entities<S: SpineSynchronizer>(
     mut bone_query: Query<(&mut Transform, &SpineBone)>,
     spine_query: Query<&Spine, With<S>>,
 ) {
+    println!("spine_sync_entities");
     for (mut bone_transform, bone) in bone_query.iter_mut() {
         if let Ok(spine) = spine_query.get(bone.spine_entity) {
             if let Some(bone) = bone.handle.get(&spine.skeleton) {
@@ -78,6 +147,7 @@ pub fn spine_sync_bones<S: SpineSynchronizer>(
     mut bone_query: Query<(&mut Transform, &SpineBone)>,
     mut spine_query: Query<&mut Spine, With<S>>,
 ) {
+    println!("spine_sync_bones");
     for (bone_transform, bone) in bone_query.iter_mut() {
         if let Ok(mut spine) = spine_query.get_mut(bone.spine_entity) {
             if let Some(mut bone) = bone.handle.get_mut(&mut spine.skeleton) {
@@ -99,6 +169,7 @@ pub fn spine_sync_entities_applied<S: SpineSynchronizer>(
     mut bone_query: Query<(&mut Transform, &SpineBone)>,
     spine_query: Query<&Spine, With<S>>,
 ) {
+    println!("spine_sync_entities_applied");
     for (mut bone_transform, bone) in bone_query.iter_mut() {
         if let Ok(spine) = spine_query.get(bone.spine_entity) {
             if let Some(bone) = bone.handle.get(&spine.skeleton) {
@@ -113,8 +184,28 @@ pub fn spine_sync_entities_applied<S: SpineSynchronizer>(
     }
 }
 
-#[derive(Component, Debug, Hash, Clone, PartialEq, Eq)]
+/// A [`Component`] which synchronizes child (bone) entities to to a [`Spine`] rig (see
+/// [`SpineBone`]).
+///
+/// ```
+/// # use bevy::prelude::*;
+/// # use bevy_spine::{SpineLoader, SpineBundle, SpineSync};
+/// # fn doc(mut commands: Commands) {
+/// commands.spawn((
+///     SpineBundle {
+///         // ..
+///         loader: SpineLoader::without_children(),
+///         ..Default::default()
+///     },
+///     SpineSync
+/// ));
+/// # }
+/// ```
+///
+/// If multiple synchronization steps are needed, additional sync components can be created (see
+/// [`SpineSynchronizerPlugin`]).
+#[derive(Component, Debug, Hash, Clone, Copy, PartialEq, Eq)]
 pub struct SpineSync;
 
 pub type SpineSyncSet = SpineSynchronizerSet<SpineSync>;
-pub type SpineSyncPlugin = SpineSynchronizerPlugin<SpineSync>;
+pub(crate) type SpineSyncPlugin = SpineSynchronizerPlugin<SpineSync, SpineSet>;

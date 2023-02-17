@@ -30,7 +30,7 @@ use crate::{
         controller::SkeletonControllerSettings, draw::CullDirection, AnimationStateData,
         BoneHandle, EventType,
     },
-    textures::{SpineTexture, SpineTextures},
+    textures::{SpineTexture, SpineTextureCreateEvent, SpineTextureDisposeEvent, SpineTextures},
 };
 
 pub use crate::{
@@ -38,22 +38,46 @@ pub use crate::{
     crossfades::Crossfades,
     entity_sync::*,
     rusty_spine::{controller::SkeletonController, Color},
-    textures::{SpineTextureCreateEvent, SpineTextureDisposeEvent},
 };
 
 pub use rusty_spine;
 
-#[derive(Debug, Hash, PartialEq, Eq, Clone, SystemSet)]
+/// System sets for Spine systems.
+#[derive(Debug, Hash, PartialEq, Eq, Clone, Copy, SystemSet)]
 pub enum SpineSet {
+    /// Loads [`SkeletonData`] assets which must exist before a [`SpineBundle`] can fully load.
     Load,
-    LoadFlush,
+    /// Spawns helper entities associated with a [`SpineBundle`] for drawing meshes and
+    /// (optionally) adding bone entities (see [`SpineLoader`]).
     Spawn,
+    /// An [`apply_system_buffers`] to load the spine helper entities this frame.
     SpawnFlush,
+    /// Sends [`SpineReadyEvent`] after [`SpineSet::SpawnFlush`], indicating [`Spine`] components on
+    /// newly spawned [`SpineBundle`]s can now be interacted with.
     Ready,
+    /// A helper Set which systems can be added into, occuring after [`SpineSet::Ready`] but before
+    /// [`SpineSet::Update`], so that entities can configure a newly spawned skeleton before they
+    /// are updated for the first time.
+    OnReady,
+    /// Advances all animations and processes Spine events (see [`SpineEvent`]).
     Update,
+    /// Updates all Spine meshes and materials for rendering.
     Render,
 }
 
+/// Add Spine support to Bevy!
+///
+/// ```
+/// # use bevy::prelude::*;
+/// # use bevy_spine::SpinePlugin;
+/// # fn doc() {
+/// App::new()
+///     .add_plugins(DefaultPlugins)
+///     .add_plugin(SpinePlugin)
+///     // ...
+///     .run();
+/// # }
+/// ```
 pub struct SpinePlugin;
 
 impl Plugin for SpinePlugin {
@@ -74,7 +98,7 @@ impl Plugin for SpinePlugin {
             .add_plugin(Material2dPlugin::<SpineAdditivePmaMaterial>::default())
             .add_plugin(Material2dPlugin::<SpineMultiplyPmaMaterial>::default())
             .add_plugin(Material2dPlugin::<SpineScreenPmaMaterial>::default())
-            .add_plugin(SpineSyncPlugin::default())
+            .add_plugin(SpineSyncPlugin::first())
             .insert_resource(SpineTextures::init())
             .insert_resource(SpineReadyEvents::default())
             .add_event::<SpineTextureCreateEvent>()
@@ -90,15 +114,18 @@ impl Plugin for SpinePlugin {
             .add_event::<SpineEvent>()
             .add_system(spine_load.in_set(SpineSet::Load))
             .add_system(spine_spawn.in_set(SpineSet::Spawn).after(SpineSet::Load))
-            .add_system(spine_ready.in_set(SpineSet::Ready).after(SpineSet::Spawn))
-            .add_system(spine_update.in_set(SpineSet::Update).after(SpineSet::Ready))
-            .add_system(spine_render.in_set(SpineSet::Render))
             .add_system(
-                apply_system_buffers
-                    .in_set(SpineSet::LoadFlush)
-                    .after(SpineSet::Load)
-                    .before(SpineSet::Spawn),
+                spine_ready
+                    .in_set(SpineSet::Ready)
+                    .after(SpineSet::Spawn)
+                    .before(SpineSet::OnReady),
             )
+            .add_system(
+                spine_update
+                    .in_set(SpineSet::Update)
+                    .after(SpineSet::OnReady),
+            )
+            .add_system(spine_render.in_set(SpineSet::Render))
             .add_system(
                 apply_system_buffers
                     .in_set(SpineSet::SpawnFlush)
@@ -108,9 +135,21 @@ impl Plugin for SpinePlugin {
     }
 }
 
+/// A live Spine [`SkeletonController`] [`Component`], ready to be manipulated.
+///
+/// This component does not exist on [`SpineBundle`] initially, since Spine assets may not yet be
+/// loaded when an entity is spawned. Querying for this component type guarantees that all entities
+/// containing it have a Spine rig that is ready to use.
 #[derive(Component)]
 pub struct Spine(pub SkeletonController);
 
+/// When loaded, a [`Spine`] entity has children entities attached to it, each containing this
+/// component.
+///
+/// To disable creation of these child entities, see [`SpineLoader::without_children`].
+///
+/// The bones are not automatically synchronized, but can be synchronized easily by adding a
+/// [`SpineSync`] component.
 #[derive(Component)]
 pub struct SpineBone {
     pub spine_entity: Entity,
@@ -135,10 +174,23 @@ impl core::ops::DerefMut for Spine {
     }
 }
 
+/// The async loader for Spine assets. Waits for Spine assets to be ready in the [`AssetServer`],
+/// then initializes child entities, and finally attaches the live [`Spine`] component.
+///
+/// When spawning a [`SpineLoader`] (typically through [`SpineBundle`]), it will create child
+/// entities representing the bones of a skeleton (see [`SpineBone`]). These bones are not
+/// synchronized (see [`SpineSync`]), and can be disabled entirely using
+/// [`SpineLoader::without_children`].
 #[derive(Component)]
 pub enum SpineLoader {
-    Loading { with_children: bool },
+    /// The spine rig is still loading.
+    Loading {
+        /// If true, will spawn child entities for each bone in the skeleton (see [`SpineBone`]).
+        with_children: bool,
+    },
+    /// The spine rig is ready.
     Ready,
+    /// The spine rig failed to load.
     Failed,
 }
 
@@ -159,6 +211,21 @@ impl SpineLoader {
         }
     }
 
+    /// Load a [`Spine`] entity without child entities containing [`SpineBone`] components.
+    ///
+    /// Renderable mesh child entities are still created.
+    ///
+    /// ```
+    /// # use bevy::prelude::*;
+    /// # use bevy_spine::{SpineLoader, SpineBundle};
+    /// # fn doc(mut commands: Commands) {
+    /// commands.spawn(SpineBundle {
+    ///     // ..
+    ///     loader: SpineLoader::without_children(),
+    ///     ..Default::default()
+    /// });
+    /// # }
+    /// ```
     pub fn without_children() -> Self {
         Self::Loading {
             with_children: false,
@@ -177,9 +244,16 @@ pub struct SpineBundle {
     pub computed_visibility: ComputedVisibility,
 }
 
+/// An [`Event`] which is sent once a [`SpineLoader`] has fully loaded a skeleton and attached the
+/// [`Spine`] component.
+///
+/// For convenience, systems receiving this event can be added to the [`SpineSet::OnReady`] set to
+/// receive this after events are sent, but before the first [`SkeletonController`] update.
 #[derive(Debug, Clone)]
 pub struct SpineReadyEvent {
+    /// The entity containing the [`Spine`] component.
     pub entity: Entity,
+    /// A list of all bones (if spawned, see [`SpineBone`]).
     pub bones: HashMap<String, Entity>,
 }
 
@@ -216,6 +290,7 @@ pub enum SpineEvent {
     },
 }
 
+/// Queued ready events, to be sent after [`SpineSet::SpawnFlush`].
 #[derive(Default, Resource)]
 struct SpineReadyEvents(Vec<SpineReadyEvent>);
 
@@ -704,7 +779,7 @@ fn empty_mesh(mesh: &mut Mesh) {
 mod assets;
 mod crossfades;
 mod entity_sync;
-mod textures;
 
 pub mod materials;
 pub mod prelude;
+pub mod textures;

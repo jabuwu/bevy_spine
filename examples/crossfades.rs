@@ -9,7 +9,7 @@ fn main() {
         .add_plugins(DefaultPlugins)
         .add_plugin(SpinePlugin)
         .add_startup_system(setup)
-        .add_system(on_spawn.before(SpineSet::Update).after(SpineSet::Ready))
+        .add_system(on_spawn.in_set(SpineSet::OnReady))
         .add_system(crossfades.after(SpineSet::Update).before(SpineSet::Render))
         .run();
 }

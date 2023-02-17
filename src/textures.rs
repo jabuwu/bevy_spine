@@ -16,12 +16,14 @@ pub(crate) struct SpineTextures {
     data: Arc<Mutex<SpineTexturesData>>,
 }
 
+/// An [`Event`] fired for each texture loaded by Spine.
 #[derive(Debug, Clone)]
 pub struct SpineTextureCreateEvent {
     pub path: String,
     pub handle: Handle<Image>,
 }
 
+/// An [`Event`] fired for each texture disposed, after [`SpineTextureCreateEvent`].
 #[derive(Debug, Clone)]
 pub struct SpineTextureDisposeEvent {
     pub path: String,
