@@ -413,38 +413,39 @@ fn spine_spawn(
                     );
                     controller.skeleton.set_to_setup_pose();
                     let mut bones = HashMap::new();
-                    commands
-                        .entity(entity)
-                        .with_children(|parent| {
-                            // TODO: currently, a mesh is created for each slot, however since we use the
-                            // combined drawer, this many meshes is usually not necessary. instead, we
-                            // may want to dynamically create meshes as needed in the render system
-                            let mut z = 0.;
-                            for _ in controller.skeleton.slots() {
-                                let mut mesh = Mesh::new(PrimitiveTopology::TriangleList);
-                                empty_mesh(&mut mesh);
-                                let mesh_handle = meshes.add(mesh);
-                                parent.spawn((
-                                    SpineMesh,
-                                    Mesh2dHandle(mesh_handle.clone()),
-                                    Transform::from_xyz(0., 0., z),
-                                    GlobalTransform::default(),
-                                    Visibility::default(),
-                                    ComputedVisibility::default(),
-                                ));
-                                z += EPSILON;
-                            }
-                            if *with_children {
-                                spawn_bones(
-                                    entity,
-                                    parent,
-                                    &controller.skeleton,
-                                    controller.skeleton.bone_root().handle(),
-                                    &mut bones,
-                                );
-                            }
-                        })
-                        .insert(Spine(controller));
+                    if let Some(mut entity_commands) = commands.get_entity(entity) {
+                        entity_commands
+                            .with_children(|parent| {
+                                // TODO: currently, a mesh is created for each slot, however since we use the
+                                // combined drawer, this many meshes is usually not necessary. instead, we
+                                // may want to dynamically create meshes as needed in the render system
+                                let mut z = 0.;
+                                for _ in controller.skeleton.slots() {
+                                    let mut mesh = Mesh::new(PrimitiveTopology::TriangleList);
+                                    empty_mesh(&mut mesh);
+                                    let mesh_handle = meshes.add(mesh);
+                                    parent.spawn((
+                                        SpineMesh,
+                                        Mesh2dHandle(mesh_handle.clone()),
+                                        Transform::from_xyz(0., 0., z),
+                                        GlobalTransform::default(),
+                                        Visibility::default(),
+                                        ComputedVisibility::default(),
+                                    ));
+                                    z += EPSILON;
+                                }
+                                if *with_children {
+                                    spawn_bones(
+                                        entity,
+                                        parent,
+                                        &controller.skeleton,
+                                        controller.skeleton.bone_root().handle(),
+                                        &mut bones,
+                                    );
+                                }
+                            })
+                            .insert(Spine(controller));
+                    }
                     *spine_loader = SpineLoader::Ready;
                     ready_events.0.push(SpineReadyEvent { entity, bones });
                 }
@@ -672,7 +673,11 @@ fn spine_render(
                                         let handle = $assets.add(<$material>::new(
                                             asset_server.load(texture_path.as_str()),
                                         ));
-                                        commands.entity(mesh_entity).insert(handle.clone());
+                                        if let Some(mut entity_commands) =
+                                            commands.get_entity(mesh_entity)
+                                        {
+                                            entity_commands.insert(handle.clone());
+                                        }
                                         handle
                                     };
                                     if let Some(material) = $assets.get_mut(&handle) {
@@ -680,12 +685,20 @@ fn spine_render(
                                     }
                                 } else {
                                     if $handle.is_some() {
-                                        commands.entity(mesh_entity).remove::<Handle<$material>>();
+                                        if let Some(mut entity_commands) =
+                                            commands.get_entity(mesh_entity)
+                                        {
+                                            entity_commands.remove::<Handle<$material>>();
+                                        }
                                     }
                                 }
                             } else {
                                 if $handle.is_some() {
-                                    commands.entity(mesh_entity).remove::<Handle<$material>>();
+                                    if let Some(mut entity_commands) =
+                                        commands.get_entity(mesh_entity)
+                                    {
+                                        entity_commands.remove::<Handle<$material>>();
+                                    }
                                 }
                             }
                         };
