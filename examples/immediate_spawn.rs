@@ -1,6 +1,6 @@
 //! Demonstrates how to spawn a [`SpineBundle`] and use it in one frame.
 
-use bevy::{app::AppExit, prelude::*};
+use bevy::{app::AppExit, core::FrameCount, prelude::*};
 use bevy_spine::{SkeletonData, Spine, SpineBundle, SpinePlugin, SpineReadyEvent, SpineSet};
 
 #[derive(Debug, Hash, PartialEq, Eq, Clone, SystemSet)]
@@ -16,7 +16,6 @@ fn main() {
         .add_startup_system(setup)
         .add_system(spawn.in_set(ExampleSet::Spawn).after(SpineSet::Load))
         .add_system(on_spawn.after(SpineSet::Ready).before(SpineSet::Update))
-        .add_system(frame_count.in_base_set(CoreSet::First))
         .add_system(
             apply_system_buffers
                 .after(ExampleSet::Spawn)
@@ -27,7 +26,6 @@ fn main() {
 
 #[derive(Default, Resource)]
 struct DemoData {
-    frame_count: usize,
     skeleton_handle: Handle<SkeletonData>,
     spawned: bool,
 }
@@ -51,6 +49,7 @@ fn spawn(
     skeletons: Res<Assets<SkeletonData>>,
     mut demo_data: ResMut<DemoData>,
     mut commands: Commands,
+    frame_count: Res<FrameCount>,
 ) {
     if !demo_data.spawned {
         if let Some(skeleton) = skeletons.get(&demo_data.skeleton_handle) {
@@ -61,7 +60,7 @@ fn spawn(
                     ..Default::default()
                 });
                 demo_data.spawned = true;
-                println!("spawned on frame: {}", demo_data.frame_count);
+                println!("spawned on frame: {}", frame_count.0);
             }
         }
     }
@@ -71,15 +70,11 @@ fn on_spawn(
     mut spine_ready_event: EventReader<SpineReadyEvent>,
     mut app_exit: EventWriter<AppExit>,
     spine_query: Query<&Spine>,
-    demo_data: Res<DemoData>,
+    frame_count: Res<FrameCount>,
 ) {
     for event in spine_ready_event.iter() {
         assert!(spine_query.contains(event.entity));
-        println!("ready on frame: {}", demo_data.frame_count);
+        println!("ready on frame: {}", frame_count.0);
         app_exit.send_default();
     }
-}
-
-fn frame_count(mut demo_data: ResMut<DemoData>) {
-    demo_data.frame_count += 1;
 }
