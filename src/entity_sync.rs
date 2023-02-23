@@ -191,7 +191,6 @@ pub fn spine_sync_entities_applied<S: SpineSynchronizer>(
 /// commands.spawn((
 ///     SpineBundle {
 ///         // ..
-///         loader: SpineLoader::without_children(),
 ///         ..Default::default()
 ///     },
 ///     SpineSync
