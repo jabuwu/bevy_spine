@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 use bevy_spine::{
-    SkeletonController, SkeletonData, Spine, SpineBundle, SpinePlugin, SpineReadyEvent, SpineSystem,
+    SkeletonController, SkeletonData, Spine, SpineBundle, SpinePlugin, SpineReadyEvent, SpineSet,
 };
 
 fn main() {
@@ -8,7 +8,7 @@ fn main() {
         .add_plugins(DefaultPlugins)
         .add_plugin(SpinePlugin)
         .add_startup_system(setup)
-        .add_system(on_spawn.in_set(SpineSystem::OnReady))
+        .add_system(on_spawn.in_set(SpineSet::OnReady))
         .run();
 }
 

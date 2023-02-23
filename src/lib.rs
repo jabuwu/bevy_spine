@@ -55,14 +55,19 @@ pub enum SpineSystem {
     /// Sends [`SpineReadyEvent`] after [`SpineSet::SpawnFlush`], indicating [`Spine`] components on
     /// newly spawned [`SpineBundle`]s can now be interacted with.
     Ready,
-    /// A helper Set which systems can be added into, occuring after [`SpineSet::Ready`] but before
-    /// [`SpineSet::Update`], so that entities can configure a newly spawned skeleton before they
-    /// are updated for the first time.
-    OnReady,
     /// Advances all animations and processes Spine events (see [`SpineEvent`]).
     Update,
     /// Updates all Spine meshes and materials for rendering.
     Render,
+}
+
+/// Helper sets for interacting with Spine systems.
+#[derive(Debug, Hash, PartialEq, Eq, Clone, Copy, SystemSet)]
+pub enum SpineSet {
+    /// A helper Set which systems can be added into, occuring after [`SpineSet::Ready`] but before
+    /// [`SpineSet::Update`], so that entities can configure a newly spawned skeleton before they
+    /// are updated for the first time.
+    OnReady,
 }
 
 /// Add Spine support to Bevy!
@@ -122,12 +127,12 @@ impl Plugin for SpinePlugin {
                 spine_ready
                     .in_set(SpineSystem::Ready)
                     .after(SpineSystem::Spawn)
-                    .before(SpineSystem::OnReady),
+                    .before(SpineSet::OnReady),
             )
             .add_system(
                 spine_update
                     .in_set(SpineSystem::Update)
-                    .after(SpineSystem::OnReady),
+                    .after(SpineSet::OnReady),
             )
             .add_system(spine_render.in_set(SpineSystem::Render))
             .add_system(

@@ -9,7 +9,7 @@ use bevy::{
     winit::WinitPlugin,
 };
 
-use crate::prelude::*;
+use crate::{prelude::*, SpineSet};
 
 pub fn test_app() -> App {
     let mut app = App::new();
@@ -54,7 +54,7 @@ pub fn test_app_with_spineboy() -> App {
                 ready_inside.store(true, Ordering::SeqCst);
             }
         })
-        .in_set(SpineSystem::OnReady),
+        .in_set(SpineSet::OnReady),
     );
     while !ready.load(Ordering::SeqCst) {
         app.update();

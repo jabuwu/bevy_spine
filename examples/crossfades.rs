@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 use bevy_spine::{
     Crossfades, SkeletonController, SkeletonData, Spine, SpineBundle, SpinePlugin, SpineReadyEvent,
-    SpineSystem,
+    SpineSet, SpineSystem,
 };
 
 fn main() {
@@ -9,7 +9,7 @@ fn main() {
         .add_plugins(DefaultPlugins)
         .add_plugin(SpinePlugin)
         .add_startup_system(setup)
-        .add_system(on_spawn.in_set(SpineSystem::OnReady))
+        .add_system(on_spawn.in_set(SpineSet::OnReady))
         .add_system(
             crossfades
                 .after(SpineSystem::Update)
