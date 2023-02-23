@@ -44,7 +44,7 @@ pub use rusty_spine;
 
 /// System sets for Spine systems.
 #[derive(Debug, Hash, PartialEq, Eq, Clone, Copy, SystemSet)]
-pub enum SpineSet {
+pub enum SpineSystem {
     /// Loads [`SkeletonData`] assets which must exist before a [`SpineBundle`] can fully load.
     Load,
     /// Spawns helper entities associated with a [`SpineBundle`] for drawing meshes and
@@ -112,25 +112,29 @@ impl Plugin for SpinePlugin {
             .init_asset_loader::<SkeletonBinaryLoader>()
             .add_event::<SpineReadyEvent>()
             .add_event::<SpineEvent>()
-            .add_system(spine_load.in_set(SpineSet::Load))
-            .add_system(spine_spawn.in_set(SpineSet::Spawn).after(SpineSet::Load))
+            .add_system(spine_load.in_set(SpineSystem::Load))
+            .add_system(
+                spine_spawn
+                    .in_set(SpineSystem::Spawn)
+                    .after(SpineSystem::Load),
+            )
             .add_system(
                 spine_ready
-                    .in_set(SpineSet::Ready)
-                    .after(SpineSet::Spawn)
-                    .before(SpineSet::OnReady),
+                    .in_set(SpineSystem::Ready)
+                    .after(SpineSystem::Spawn)
+                    .before(SpineSystem::OnReady),
             )
             .add_system(
                 spine_update
-                    .in_set(SpineSet::Update)
-                    .after(SpineSet::OnReady),
+                    .in_set(SpineSystem::Update)
+                    .after(SpineSystem::OnReady),
             )
-            .add_system(spine_render.in_set(SpineSet::Render))
+            .add_system(spine_render.in_set(SpineSystem::Render))
             .add_system(
                 apply_system_buffers
-                    .in_set(SpineSet::SpawnFlush)
-                    .after(SpineSet::Spawn)
-                    .before(SpineSet::Ready),
+                    .in_set(SpineSystem::SpawnFlush)
+                    .after(SpineSystem::Spawn)
+                    .before(SpineSystem::Ready),
             );
     }
 }

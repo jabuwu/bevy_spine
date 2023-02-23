@@ -54,7 +54,7 @@ pub fn test_app_with_spineboy() -> App {
                 ready_inside.store(true, Ordering::SeqCst);
             }
         })
-        .in_set(SpineSet::OnReady),
+        .in_set(SpineSystem::OnReady),
     );
     while !ready.load(Ordering::SeqCst) {
         app.update();
