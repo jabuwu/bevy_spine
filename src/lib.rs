@@ -315,6 +315,17 @@ fn spine_load(
     spine_textures: Res<SpineTextures>,
     asset_server: Res<AssetServer>,
 ) {
+    // check if any assets are loading, else, early out to avoid triggering change detection
+    let mut loading = false;
+    for (_, skeleton_data_asset) in skeleton_data_assets.iter() {
+        if matches!(skeleton_data_asset.status, SkeletonDataStatus::Loading) {
+            loading = true;
+            break;
+        }
+    }
+    if !loading {
+        return;
+    }
     for (_, skeleton_data_asset) in skeleton_data_assets.iter_mut() {
         let SkeletonData {
             atlas_handle,
