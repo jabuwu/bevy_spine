@@ -391,11 +391,6 @@ fn spine_spawn(
     mut meshes: ResMut<Assets<Mesh>>,
     mut ready_events: ResMut<SpineReadyEvents>,
     mut skeleton_data_assets: ResMut<Assets<SkeletonData>>,
-    mut images: ResMut<Assets<Image>>,
-    mut texture_create_events: EventWriter<SpineTextureCreateEvent>,
-    mut texture_dispose_events: EventWriter<SpineTextureDisposeEvent>,
-    spine_textures: Res<SpineTextures>,
-    asset_server: Res<AssetServer>,
 ) {
     for (mut spine_loader, entity, data_handle, crossfades) in skeleton_query.iter_mut() {
         if let SpineLoader::Loading { with_children } = spine_loader.as_ref() {
@@ -465,13 +460,6 @@ fn spine_spawn(
             }
         }
     }
-
-    spine_textures.update(
-        asset_server.as_ref(),
-        images.as_mut(),
-        &mut texture_create_events,
-        &mut texture_dispose_events,
-    );
 }
 
 fn spawn_bones(
