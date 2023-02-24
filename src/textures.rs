@@ -8,8 +8,16 @@ use bevy::{
     },
 };
 
+use crate::Atlas;
+
 #[derive(Debug)]
 pub(crate) struct SpineTexture(pub String);
+
+#[derive(Debug)]
+struct SpineTextureInternal {
+    pub path: String,
+    pub atlas_address: usize,
+}
 
 #[derive(Resource)]
 pub(crate) struct SpineTextures {
@@ -21,6 +29,7 @@ pub(crate) struct SpineTextures {
 pub struct SpineTextureCreateEvent {
     pub path: String,
     pub handle: Handle<Image>,
+    pub atlas: Handle<Atlas>,
 }
 
 /// An [`Event`] fired for each texture disposed, after [`SpineTextureCreateEvent`].
@@ -34,8 +43,8 @@ pub struct SpineTextureDisposeEvent {
 pub(crate) struct SpineTexturesData {
     handles: Vec<(String, Handle<Image>)>,
     initialize: Vec<Handle<Image>>,
-    remember: Vec<String>,
-    forget: Vec<String>,
+    remember: Vec<SpineTextureInternal>,
+    forget: Vec<SpineTextureInternal>,
 }
 
 impl SpineTextures {
@@ -44,18 +53,23 @@ impl SpineTextures {
 
         let data2 = data.clone();
         rusty_spine::extension::set_create_texture_cb(move |page, path| {
-            data2.lock().unwrap().remember.push(path.to_owned());
+            data2.lock().unwrap().remember.push(SpineTextureInternal {
+                path: path.to_owned(),
+                atlas_address: page.atlas().c_ptr() as usize,
+            });
             page.renderer_object().set(SpineTexture(path.to_owned()));
         });
 
         let data3 = data.clone();
         rusty_spine::extension::set_dispose_texture_cb(move |page| unsafe {
-            data3.lock().unwrap().forget.push(
-                page.renderer_object()
+            data3.lock().unwrap().forget.push(SpineTextureInternal {
+                path: page
+                    .renderer_object()
                     .get_unchecked::<SpineTexture>()
                     .0
                     .clone(),
-            );
+                atlas_address: page.atlas().c_ptr() as usize,
+            });
             page.renderer_object().dispose::<SpineTexture>();
         });
 
@@ -65,22 +79,27 @@ impl SpineTextures {
     pub fn update(
         &self,
         asset_server: &AssetServer,
+        atlases: &Assets<Atlas>,
         images: &mut Assets<Image>,
         create_events: &mut EventWriter<SpineTextureCreateEvent>,
         dispose_events: &mut EventWriter<SpineTextureDisposeEvent>,
     ) {
         let mut data = self.data.lock().unwrap();
-        while let Some(image) = data.remember.pop() {
-            let handle = asset_server.load(&image);
-            data.handles.push((image.clone(), handle.clone()));
+        while let Some(texture) = data.remember.pop() {
+            let handle = asset_server.load(&texture.path);
             data.initialize.push(handle.clone());
-            create_events.send(SpineTextureCreateEvent {
-                path: image,
-                handle,
-            });
+            // if none, the atlas was already deleted before getting here
+            if let Some(atlas) = find_matching_atlas(atlases, texture.atlas_address) {
+                data.handles.push((texture.path.clone(), handle.clone()));
+                create_events.send(SpineTextureCreateEvent {
+                    path: texture.path,
+                    atlas,
+                    handle,
+                });
+            }
         }
-        while let Some(image) = data.forget.pop() {
-            if let Some(index) = data.handles.iter().position(|i| i.0 == image) {
+        while let Some(texture) = data.forget.pop() {
+            if let Some(index) = data.handles.iter().position(|i| i.0 == texture.path) {
                 let initialize_position = data
                     .initialize
                     .iter()
@@ -89,7 +108,7 @@ impl SpineTextures {
                     data.initialize.remove(initialize_position);
                 }
                 dispose_events.send(SpineTextureDisposeEvent {
-                    path: image,
+                    path: texture.path,
                     handle: data.handles[index].1.clone(),
                 });
                 data.handles.remove(index);
@@ -110,4 +129,13 @@ impl SpineTextures {
             data.initialize.remove(*remove);
         }
     }
+}
+
+fn find_matching_atlas(atlases: &Assets<Atlas>, atlas_address: usize) -> Option<Handle<Atlas>> {
+    for (atlas_handle, atlas) in atlases.iter() {
+        if atlas.atlas.c_ptr() as usize == atlas_address {
+            return Some(atlases.get_handle(atlas_handle));
+        }
+    }
+    None
 }
