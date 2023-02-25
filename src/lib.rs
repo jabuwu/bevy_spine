@@ -440,6 +440,10 @@ fn spine_spawn(
                                     let mut mesh = Mesh::new(PrimitiveTopology::TriangleList);
                                     empty_mesh(&mut mesh);
                                     let mesh_handle = meshes.add(mesh);
+                                    #[cfg(feature = "workaround_5732")]
+                                    {
+                                        workaround_5732::store(mesh_handle.clone_untyped());
+                                    }
                                     parent.spawn((
                                         SpineMesh,
                                         Mesh2dHandle(mesh_handle.clone()),
@@ -682,6 +686,10 @@ fn spine_render(
                                         let handle = $assets.add(<$material>::new(
                                             asset_server.load(texture_path.as_str()),
                                         ));
+                                        #[cfg(feature = "workaround_5732")]
+                                        {
+                                            workaround_5732::store(handle.clone_untyped());
+                                        }
                                         if let Some(mut entity_commands) =
                                             commands.get_entity(mesh_entity)
                                         {
@@ -808,3 +816,6 @@ pub mod textures;
 
 #[cfg(test)]
 mod test;
+
+#[cfg(feature = "workaround_5732")]
+mod workaround_5732;

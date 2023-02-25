@@ -19,3 +19,6 @@ bevy_math = { git = "https://github.com/bevyengine/bevy", rev = "978f7cd8bf94239
 [dev-dependencies]
 lerp = "0.4"
 bevy = { git = "https://github.com/bevyengine/bevy", rev = "978f7cd8bf9423961f663725cba18fb3ed75b46d", default-features = true }
+
+[features]
+workaround_5732 = []
