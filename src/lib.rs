@@ -323,58 +323,57 @@ fn spine_load(
             break;
         }
     }
-    if !loading {
-        return;
-    }
-    for (_, skeleton_data_asset) in skeleton_data_assets.iter_mut() {
-        let SkeletonData {
-            atlas_handle,
-            kind,
-            status,
-            premultiplied_alpha,
-        } = skeleton_data_asset;
-        if matches!(status, SkeletonDataStatus::Loading) {
-            let atlas = if let Some(atlas) = atlases.get(atlas_handle) {
-                atlas
-            } else {
-                continue;
-            };
-            if let Some(page) = atlas.atlas.pages().next() {
-                *premultiplied_alpha = page.pma();
-            }
-            match kind {
-                SkeletonDataKind::JsonFile(json_handle) => {
-                    let json = if let Some(json) = jsons.get(json_handle) {
-                        json
-                    } else {
-                        continue;
-                    };
-                    let skeleton_json = rusty_spine::SkeletonJson::new(atlas.atlas.clone());
-                    match skeleton_json.read_skeleton_data(&json.json) {
-                        Ok(skeleton_data) => {
-                            *status = SkeletonDataStatus::Loaded(Arc::new(skeleton_data));
-                        }
-                        Err(_err) => {
-                            *status = SkeletonDataStatus::Failed;
+    if loading {
+        for (_, skeleton_data_asset) in skeleton_data_assets.iter_mut() {
+            let SkeletonData {
+                atlas_handle,
+                kind,
+                status,
+                premultiplied_alpha,
+            } = skeleton_data_asset;
+            if matches!(status, SkeletonDataStatus::Loading) {
+                let atlas = if let Some(atlas) = atlases.get(atlas_handle) {
+                    atlas
+                } else {
+                    continue;
+                };
+                if let Some(page) = atlas.atlas.pages().next() {
+                    *premultiplied_alpha = page.pma();
+                }
+                match kind {
+                    SkeletonDataKind::JsonFile(json_handle) => {
+                        let json = if let Some(json) = jsons.get(json_handle) {
+                            json
+                        } else {
                             continue;
+                        };
+                        let skeleton_json = rusty_spine::SkeletonJson::new(atlas.atlas.clone());
+                        match skeleton_json.read_skeleton_data(&json.json) {
+                            Ok(skeleton_data) => {
+                                *status = SkeletonDataStatus::Loaded(Arc::new(skeleton_data));
+                            }
+                            Err(_err) => {
+                                *status = SkeletonDataStatus::Failed;
+                                continue;
+                            }
                         }
                     }
-                }
-                SkeletonDataKind::BinaryFile(binary_handle) => {
-                    let binary = if let Some(binary) = binaries.get(binary_handle) {
-                        binary
-                    } else {
-                        continue;
-                    };
-                    let skeleton_binary = rusty_spine::SkeletonBinary::new(atlas.atlas.clone());
-                    match skeleton_binary.read_skeleton_data(&binary.binary) {
-                        Ok(skeleton_data) => {
-                            *status = SkeletonDataStatus::Loaded(Arc::new(skeleton_data));
-                        }
-                        Err(_err) => {
-                            // TODO: print error?
-                            *status = SkeletonDataStatus::Failed;
+                    SkeletonDataKind::BinaryFile(binary_handle) => {
+                        let binary = if let Some(binary) = binaries.get(binary_handle) {
+                            binary
+                        } else {
                             continue;
+                        };
+                        let skeleton_binary = rusty_spine::SkeletonBinary::new(atlas.atlas.clone());
+                        match skeleton_binary.read_skeleton_data(&binary.binary) {
+                            Ok(skeleton_data) => {
+                                *status = SkeletonDataStatus::Loaded(Arc::new(skeleton_data));
+                            }
+                            Err(_err) => {
+                                // TODO: print error?
+                                *status = SkeletonDataStatus::Failed;
+                                continue;
+                            }
                         }
                     }
                 }
