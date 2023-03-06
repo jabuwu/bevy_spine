@@ -149,11 +149,11 @@ fn player_spine_events(
                             "aim",
                             true,
                         );
-                        let _ = controller.animation_state.set_animation_by_name(
-                            PLAYER_TRACK_RUN,
-                            "run",
-                            true,
-                        );
+                        let mut run_track = controller
+                            .animation_state
+                            .set_animation_by_name(PLAYER_TRACK_RUN, "run", true)
+                            .unwrap();
+                        run_track.set_shortest_rotation(true);
                         controller
                             .animation_state
                             .track_at_index_mut(PLAYER_TRACK_AIM as usize)
