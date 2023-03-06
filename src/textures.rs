@@ -1,12 +1,6 @@
 use std::sync::{Arc, Mutex};
 
-use bevy::{
-    prelude::*,
-    render::{
-        render_resource::{FilterMode, SamplerDescriptor},
-        texture::ImageSampler,
-    },
-};
+use bevy::prelude::*;
 
 use crate::Atlas;
 
@@ -42,7 +36,6 @@ pub struct SpineTextureDisposeEvent {
 #[derive(Default)]
 pub(crate) struct SpineTexturesData {
     handles: Vec<(String, Handle<Image>)>,
-    initialize: Vec<Handle<Image>>,
     remember: Vec<SpineTextureInternal>,
     forget: Vec<SpineTextureInternal>,
 }
@@ -80,14 +73,12 @@ impl SpineTextures {
         &self,
         asset_server: &AssetServer,
         atlases: &Assets<Atlas>,
-        images: &mut Assets<Image>,
         create_events: &mut EventWriter<SpineTextureCreateEvent>,
         dispose_events: &mut EventWriter<SpineTextureDisposeEvent>,
     ) {
         let mut data = self.data.lock().unwrap();
         while let Some(texture) = data.remember.pop() {
             let handle = asset_server.load(&texture.path);
-            data.initialize.push(handle.clone());
             // if none, the atlas was already deleted before getting here
             if let Some(atlas) = find_matching_atlas(atlases, texture.atlas_address) {
                 data.handles.push((texture.path.clone(), handle.clone()));
@@ -100,33 +91,12 @@ impl SpineTextures {
         }
         while let Some(texture) = data.forget.pop() {
             if let Some(index) = data.handles.iter().position(|i| i.0 == texture.path) {
-                let initialize_position = data
-                    .initialize
-                    .iter()
-                    .position(|h| *h == data.handles[index].1);
-                if let Some(initialize_position) = initialize_position {
-                    data.initialize.remove(initialize_position);
-                }
                 dispose_events.send(SpineTextureDisposeEvent {
                     path: texture.path,
                     handle: data.handles[index].1.clone(),
                 });
                 data.handles.remove(index);
             }
-        }
-        let mut remove_initialize = vec![];
-        for (i, handle) in data.initialize.iter().enumerate() {
-            if let Some(image) = images.get_mut(handle) {
-                image.sampler_descriptor = ImageSampler::Descriptor(SamplerDescriptor {
-                    mag_filter: FilterMode::Nearest,
-                    min_filter: FilterMode::Nearest,
-                    ..Default::default()
-                });
-                remove_initialize.push(i);
-            }
-        }
-        for remove in remove_initialize.iter().rev() {
-            data.initialize.remove(*remove);
         }
     }
 }
