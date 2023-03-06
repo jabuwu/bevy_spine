@@ -184,7 +184,8 @@ fn player_aim(
     camera_query: Query<(Entity, &Camera)>,
     time: Res<Time>,
 ) {
-    let cursor_position = if let Some(cursor_position) = window_query.single().cursor_position() {
+    let Some(window) = window_query.get_single().ok() else { return };
+    let cursor_position = if let Some(cursor_position) = window.cursor_position() {
         if let Ok((camera_entity, camera)) = camera_query.get_single() {
             if let Ok(camera_transform) = global_transform_query.get(camera_entity) {
                 let window_size = Vec2::new(

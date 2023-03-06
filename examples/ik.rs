@@ -50,6 +50,7 @@ fn on_spawn(
 }
 
 fn ik(mut spine_query: Query<&mut Spine>, window_query: Query<&Window>) {
+    let Some(window) = window_query.get_single().ok() else { return };
     for mut spine in spine_query.iter_mut() {
         let Spine(SkeletonController { skeleton, .. }) = spine.as_mut();
         skeleton.set_scale_x(0.5);
@@ -57,7 +58,7 @@ fn ik(mut spine_query: Query<&mut Spine>, window_query: Query<&Window>) {
         skeleton.set_y(-200.);
         skeleton.set_x(-200.);
     }
-    let cursor_position = if let Some(cursor_position) = window_query.single().cursor_position() {
+    let cursor_position = if let Some(cursor_position) = window.cursor_position() {
         cursor_position
     } else {
         return;
@@ -72,11 +73,8 @@ fn ik(mut spine_query: Query<&mut Spine>, window_query: Query<&Window>) {
         } else {
             continue;
         };
-        let cursor_adjustment = cursor_position
-            - Vec2::new(
-                window_query.single().width() * 0.5,
-                window_query.single().height() * 0.5,
-            );
+        let cursor_adjustment =
+            cursor_position - Vec2::new(window.width() * 0.5, window.height() * 0.5);
         let cursor = bone
             .parent()
             .unwrap()
