@@ -6,9 +6,12 @@ use std::sync::{Mutex, Once};
 
 use bevy::prelude::*;
 
+#[cfg(target_arch = "wasm32")]
 static mut HANDLES: MaybeUninit<Mutex<HashSet<HandleUntyped>>> = MaybeUninit::uninit();
+#[cfg(target_arch = "wasm32")]
 static ONCE: Once = Once::new();
 
+#[cfg(target_arch = "wasm32")]
 pub(crate) fn store(handle: HandleUntyped) {
     let handles = unsafe {
         ONCE.call_once(|| {
@@ -20,3 +23,6 @@ pub(crate) fn store(handle: HandleUntyped) {
     let mut guard = handles.lock().expect("expected to lock mutex");
     guard.insert(handle);
 }
+
+#[cfg(not(target_arch = "wasm32"))]
+pub(crate) fn store(_handle: HandleUntyped) {}
