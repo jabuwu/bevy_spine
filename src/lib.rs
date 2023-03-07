@@ -1,6 +1,6 @@
-//! There's not much documentation yet. Check out
-//! [the examples](https://github.com/jabuwu/bevy_spine/tree/main/examples) and the
-//! [rusty_spine docs](https://docs.rs/rusty_spine/0.5.0)
+//! A Bevy 0.10 plugin for Spine 4.1
+//!
+//! Add [`SpinePlugin`] to your Bevy app and spawn a [`SpineBundle`] to get started!
 
 use std::{
     collections::{HashMap, VecDeque},
@@ -33,12 +33,10 @@ use crate::{
     textures::{SpineTexture, SpineTextureCreateEvent, SpineTextureDisposeEvent, SpineTextures},
 };
 
-pub use crate::{
-    assets::*,
-    crossfades::Crossfades,
-    entity_sync::*,
-    rusty_spine::{controller::SkeletonController, Color},
-};
+pub use crate::{assets::*, crossfades::Crossfades, entity_sync::*, rusty_spine::Color};
+
+/// See [`rusty_spine`] docs for more info.
+pub use crate::rusty_spine::controller::SkeletonController;
 
 pub use rusty_spine;
 
@@ -52,8 +50,8 @@ pub enum SpineSystem {
     Spawn,
     /// An [`apply_system_buffers`] to load the spine helper entities this frame.
     SpawnFlush,
-    /// Sends [`SpineReadyEvent`] after [`SpineSet::SpawnFlush`], indicating [`Spine`] components on
-    /// newly spawned [`SpineBundle`]s can now be interacted with.
+    /// Sends [`SpineReadyEvent`] after [`SpineSystem::SpawnFlush`], indicating [`Spine`] components
+    /// on newly spawned [`SpineBundle`]s can now be interacted with.
     Ready,
     /// Advances all animations and processes Spine events (see [`SpineEvent`]).
     Update,
@@ -64,9 +62,9 @@ pub enum SpineSystem {
 /// Helper sets for interacting with Spine systems.
 #[derive(Debug, Hash, PartialEq, Eq, Clone, Copy, SystemSet)]
 pub enum SpineSet {
-    /// A helper Set which systems can be added into, occuring after [`SpineSet::Ready`] but before
-    /// [`SpineSet::Update`], so that entities can configure a newly spawned skeleton before they
-    /// are updated for the first time.
+    /// A helper Set which systems can be added into, occuring after [`SpineSystem::Ready`] but
+    /// before [`SpineSystem::Update`], so that entities can configure a newly spawned skeleton
+    /// before they are updated for the first time.
     OnReady,
 }
 
@@ -166,6 +164,7 @@ pub struct SpineBone {
     pub name: String,
 }
 
+/// Marker component for child entities containing [`Mesh`] components for Spine rendering.
 #[derive(Component)]
 pub struct SpineMesh;
 
@@ -242,6 +241,66 @@ impl SpineLoader {
     }
 }
 
+/// Bundle for Spine skeletons with all the necessary components.
+///
+/// See [`SkeletonData::new_from_json`] or [`SkeletonData::new_from_binary`] for example usages.
+///
+/// Note that this bundle does not contain the [`Spine`] component itself, which is the primary way
+/// to query and interact with Spine skeletons. Instead, a [`SpineLoader`] is added which ensures
+/// that all the necessary assets ([`Atlas`] and [`SkeletonJson`]/[`SkeletonBinary`]) are loaded
+/// before instantiating the Spine skeleton. This ensures that querying for [`Spine`] components
+/// will always yield fully instantiated skeletons.
+///
+/// It is possible to spawn a Spine skeleton and initialize it in the same frame. To do so, ensure
+/// that the spawning system occurs before [`SpineSystem::Spawn`] and the initializing system is in
+/// the [`SpineSet::OnReady`] set (assuming the [`SkeletonData`] has already been loaded). Listen
+/// for [`SpineReadyEvent`] to get newly loaded skeletons.
+///
+/// ```
+/// use bevy::prelude::*;
+/// use bevy_spine::prelude::*;
+///
+/// # let mut app = App::new();
+/// {
+///     // in main() or a plugin
+///     app.add_system(spawn_spine.before(SpineSystem::Spawn));
+///     app.add_system(init_spine.in_set(SpineSet::OnReady));
+/// }
+///
+/// #[derive(Resource)]
+/// struct MyGameAssets {
+///     // loaded ahead of time
+///     skeleton: Handle<SkeletonData>
+/// }
+///
+/// #[derive(Component)]
+/// struct MySpine;
+///
+/// fn spawn_spine(
+///     mut commands: Commands,
+///     my_game_assets: Res<MyGameAssets>
+/// ) {
+///     commands.spawn((
+///         SpineBundle {
+///             skeleton: my_game_assets.skeleton.clone(),
+///             ..Default::default()
+///         },
+///         MySpine
+///     ));
+/// }
+///
+/// fn init_spine(
+///     mut spine_ready_events: EventReader<SpineReadyEvent>,
+///     mut spine_query: Query<&mut Spine, With<MySpine>>
+/// ) {
+///     for spine_ready_event in spine_ready_events.iter() {
+///         if let Ok(mut spine) = spine_query.get_mut(spine_ready_event.entity) {
+///             // the skeleton will start playing the animation the same frame it spawns on
+///             spine.animation_state.set_animation_by_name(0, "animation", true);
+///         }
+///     }
+/// }
+/// ```
 #[derive(Default, Bundle)]
 pub struct SpineBundle {
     pub loader: SpineLoader,
@@ -266,6 +325,25 @@ pub struct SpineReadyEvent {
     pub bones: HashMap<String, Entity>,
 }
 
+/// A Spine event fired from a playing animation.
+///
+/// ```
+/// # use bevy::prelude::*;
+/// # use bevy_spine::prelude::*;
+/// // bevy system
+/// fn on_spine_event(
+///     mut spine_events: EventReader<SpineEvent>,
+///     mut commands: Commands,
+///     asset_server: Res<AssetServer>,
+/// ) {
+///     for event in spine_events.iter() {
+///         if let SpineEvent::Event { name, entity, .. } = event {
+///             dbg!("spine event fired: {}", name);
+///             dbg!("from entity: {:?}", entity);
+///         }
+///     }
+/// }
+/// ```
 #[derive(Debug, Clone)]
 pub enum SpineEvent {
     Start {
@@ -808,7 +886,6 @@ mod crossfades;
 mod entity_sync;
 
 pub mod materials;
-pub mod prelude;
 pub mod textures;
 
 #[cfg(test)]
@@ -816,3 +893,13 @@ mod test;
 
 #[cfg(feature = "workaround_5732")]
 mod workaround_5732;
+
+#[doc(hidden)]
+pub mod prelude {
+    pub use crate::{
+        Crossfades, SkeletonController, SkeletonData, Spine, SpineBone, SpineBundle, SpineEvent,
+        SpineLoader, SpinePlugin, SpineReadyEvent, SpineSet, SpineSync, SpineSyncSet,
+        SpineSyncSystem, SpineSystem,
+    };
+    pub use rusty_spine::{BoneHandle, SlotHandle};
+}

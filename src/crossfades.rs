@@ -3,7 +3,33 @@ use std::collections::HashMap;
 use bevy::prelude::*;
 use rusty_spine::AnimationStateData;
 
-#[derive(Component, Default)]
+/// Crossfade data to apply to [`rusty_spine::AnimationStateData`]. Allows automated crossfading
+/// between animations.
+///
+/// Apply to a [`SpineBundle`](`crate::SpineBundle`) upon creation:
+///
+/// ```
+
+/// # use bevy::prelude::*;
+/// # use bevy_spine::prelude::*;
+/// # fn doc(mut commands: Commands) {
+/// let mut crossfades = Crossfades::new();
+///
+/// // Blend between walk -> run for 0.2 secs
+/// crossfades.add("walk", "run", 0.2);
+///
+/// // Apply in the other direction too
+/// crossfades.add("run", "walk", 0.2);
+///
+/// commands.spawn(SpineBundle {
+///     // ...
+///     crossfades,
+///     ..Default::default()
+/// });
+/// # }
+/// ```
+
+#[derive(Component, Default, Clone)]
 pub struct Crossfades {
     mix_durations: HashMap<(String, String), f32>,
 }

@@ -4,25 +4,33 @@ use bevy::prelude::*;
 
 use crate::{Spine, SpineBone, SpineSystem};
 
-#[cfg(doc)]
-use crate::SpinePlugin;
-
+/// See [`SpineSynchronizerPlugin`].
 pub trait SpineSynchronizer: Component + Clone + Eq + Debug + Hash {}
 impl<T> SpineSynchronizer for T where T: Component + Clone + Eq + Debug + Hash {}
 
 #[derive(Hash, Debug, PartialEq, Eq, Clone, Copy, SystemSet)]
 pub enum SpineSynchronizerSystem<T: SpineSynchronizer> {
+    /// Set for [`spine_sync_entities`]
     SyncEntities,
+    /// Set for [`spine_sync_bones`]
     SyncBones,
+    /// Set for [`spine_sync_entities_applied`]
     SyncEntitiesApplied,
     #[system_set(ignore_fields)]
     _Data(PhantomData<T>),
 }
 
+/// Generic synchronization set. See [`SpineSyncSet`] for example usage.
 #[derive(Hash, Debug, PartialEq, Eq, Clone, Copy, SystemSet)]
 pub enum SpineSynchronizerSet<T: SpineSynchronizer> {
+    /// Occurs before all synchronization systems.
     BeforeSync,
+    /// Occurs after synchronizing [`SpineBone`] entity transforms to the skeleton, but before
+    /// re-applying these transforms to the Spine skeleton. Useful for moving bones around while
+    /// still applying Spine's constraints.
     DuringSync,
+    /// Occurs after synchronizing [`SpineBone`] entity transforms back to the Spine skeleton.
+    /// Useful for any final adjustments, bypassing Spine's constraints.
     AfterSync,
     #[system_set(ignore_fields)]
     _Data(PhantomData<T>),
@@ -30,9 +38,9 @@ pub enum SpineSynchronizerSet<T: SpineSynchronizer> {
 
 /// A plugin for synchronizing [`SpineBone`] components with a rig.
 ///
-/// This plugin is added automatically in [`SpinePlugin`] for [`SpineSync`] and does not need to be
-/// added manually. However, custom synchronization steps can be added to allow for multiple syncs
-/// in a single frame.
+/// This plugin is added automatically in [`SpinePlugin`](`crate::SpinePlugin`) for [`SpineSync`]
+/// and does not need to be added manually. However, custom synchronization steps can be added to
+/// allow for multiple syncs in a single frame.
 ///
 /// ```
 /// # use bevy::prelude::*;
@@ -130,6 +138,7 @@ impl<T: SpineSynchronizer, A: SystemSet + Copy> Plugin for SpineSynchronizerPlug
     }
 }
 
+/// Synchronizes [`SpineBone`] transforms to the Spine skeleton bone transforms.
 pub fn spine_sync_entities<S: SpineSynchronizer>(
     mut bone_query: Query<(&mut Transform, &SpineBone)>,
     spine_query: Query<&Spine, With<S>>,
@@ -148,6 +157,7 @@ pub fn spine_sync_entities<S: SpineSynchronizer>(
     }
 }
 
+/// Synchronizes Spine skeleton bones to [`SpineBone`] transforms.
 pub fn spine_sync_bones<S: SpineSynchronizer>(
     mut bone_query: Query<(&mut Transform, &SpineBone)>,
     mut spine_query: Query<&mut Spine, With<S>>,
@@ -169,6 +179,7 @@ pub fn spine_sync_bones<S: SpineSynchronizer>(
     }
 }
 
+/// Synchronizes [`SpineBone`] transforms with the final, applied Spine bones transforms.
 pub fn spine_sync_entities_applied<S: SpineSynchronizer>(
     mut bone_query: Query<(&mut Transform, &SpineBone)>,
     spine_query: Query<&Spine, With<S>>,
@@ -204,11 +215,61 @@ pub fn spine_sync_entities_applied<S: SpineSynchronizer>(
 /// # }
 /// ```
 ///
+/// To coordinate systems around synchronization, see [`SpineSyncSet`].
+///
 /// If multiple synchronization steps are needed, additional sync components can be created (see
 /// [`SpineSynchronizerPlugin`]).
 #[derive(Component, Debug, Hash, Clone, Copy, PartialEq, Eq)]
 pub struct SpineSync;
 
+/// The default [`SpineSynchronizerSystem`], see that struct for more docs.
 pub type SpineSyncSystem = SpineSynchronizerSystem<SpineSync>;
+/// The default [`SpineSynchronizerSet`], see that struct for more docs.
+///
+/// Add systems to this set to coordinate with the Spine synchronization systems.
+///
+/// ```
+/// # use bevy::prelude::*;
+/// use bevy_spine::prelude::*;
+///
+/// # fn doc() {
+/// fn main() {
+///     App::new()
+///         .add_plugins(DefaultPlugins)
+///         .add_plugin(SpinePlugin)
+///         .add_system(spawn)
+///         .add_system(before_sync.in_set(SpineSyncSet::BeforeSync))
+///         .add_system(during_sync.in_set(SpineSyncSet::DuringSync))
+///         .add_system(after_sync.in_set(SpineSyncSet::AfterSync))
+///         // ...
+///         .run();
+/// }
+/// # }
+///
+/// fn spawn(mut commands: Commands) {
+///     // .. load spine ..
+///     commands.spawn((
+///         SpineBundle {
+///             // ..
+///             ..Default::default()
+///         },
+///         SpineSync,
+///     ));
+/// }
+///
+/// fn before_sync() {
+///     // occurs before any spine sync systems
+/// }
+///
+/// fn during_sync() {
+///     // occurs after syncing SpineBone transforms, but before syncing the transforms back to
+///     // the spine skeleton. if you want to move spine bones programmatically, you probably want
+///     // to do it here
+/// }
+///
+/// fn after_sync() {
+///     // occurs after all synchronization, useful to move bones while bypassing spine contraints
+/// }
+/// ```
 pub type SpineSyncSet = SpineSynchronizerSet<SpineSync>;
 pub(crate) type SpineSyncPlugin = SpineSynchronizerPlugin<SpineSync, SpineSystem>;

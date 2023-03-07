@@ -1,3 +1,5 @@
+//! Materials for Spine blend modes.
+
 use std::sync::{Arc, Mutex, Once};
 
 use bevy::{
@@ -64,7 +66,8 @@ impl SpineShader {
 }
 
 macro_rules! material {
-    ($uuid:literal, $name:ident, $shader:expr, $blend_state:expr) => {
+    ($(#[$($attrss:tt)*])* $uuid:literal, $name:ident, $shader:expr, $blend_state:expr) => {
+        $(#[$($attrss)*])*
         #[derive(AsBindGroup, TypeUuid, Clone)]
         #[uuid = $uuid]
         pub struct $name {
@@ -113,6 +116,7 @@ macro_rules! material {
 }
 
 material!(
+    /// Normal blend mode material, non-premultiplied-alpha
     "22413663-46b0-4b9b-b714-d72fb87dc7ef",
     SpineNormalMaterial,
     SpineShader::get_fragment(),
@@ -131,6 +135,7 @@ material!(
 );
 
 material!(
+    /// Additive blend mode material, non-premultiplied-alpha
     "092d3b15-c3b4-45d6-95fd-3a24a86e08d7",
     SpineAdditiveMaterial,
     SpineShader::get_fragment(),
@@ -149,6 +154,7 @@ material!(
 );
 
 material!(
+    /// Multiply blend mode material, non-premultiplied-alpha
     "ec4d2018-ad8f-4ff8-bbf7-33f13dab7ef3",
     SpineMultiplyMaterial,
     SpineShader::get_fragment(),
@@ -167,6 +173,7 @@ material!(
 );
 
 material!(
+    /// Screen blend mode material, non-premultiplied-alpha
     "5d357844-6a06-4238-aaef-9da95186590b",
     SpineScreenMaterial,
     SpineShader::get_fragment(),
@@ -185,6 +192,7 @@ material!(
 );
 
 material!(
+    /// Normal blend mode material, premultiplied-alpha
     "296e2f58-f5f0-4a51-9f4b-dbcec06ddc04",
     SpineNormalPmaMaterial,
     SpineShader::get_fragment_pma(),
@@ -203,6 +211,7 @@ material!(
 );
 
 material!(
+    /// Additive blend mode material, premultiplied-alpha
     "0f546186-4e05-434b-a0e1-3e1454b2cc7a",
     SpineAdditivePmaMaterial,
     SpineShader::get_fragment_pma(),
@@ -221,6 +230,7 @@ material!(
 );
 
 material!(
+    /// Multiple blend mode material, premultiplied-alpha
     "d8ef56cf-88b9-46f8-971b-7583baf8c20b",
     SpineMultiplyPmaMaterial,
     SpineShader::get_fragment_pma(),
@@ -239,6 +249,7 @@ material!(
 );
 
 material!(
+    /// Screen blend mode material, premultiplied-alpha
     "1cd4d391-e106-4585-928f-124f998f28b6",
     SpineScreenPmaMaterial,
     SpineShader::get_fragment_pma(),

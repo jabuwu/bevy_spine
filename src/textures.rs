@@ -1,3 +1,5 @@
+//! Events related to textures loaded by Spine.
+
 use std::sync::{Arc, Mutex};
 
 use bevy::prelude::*;
