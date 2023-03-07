@@ -340,8 +340,8 @@ pub struct SpineReadyEvent {
 /// ) {
 ///     for event in spine_events.iter() {
 ///         if let SpineEvent::Event { name, entity, .. } = event {
-///             dbg!("spine event fired: {}", name);
-///             dbg!("from entity: {:?}", entity);
+///             println!("spine event fired: {}", name);
+///             println!("from entity: {:?}", entity);
 ///         }
 ///     }
 /// }
