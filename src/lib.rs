@@ -327,6 +327,8 @@ pub struct SpineReadyEvent {
 
 /// A Spine event fired from a playing animation.
 ///
+/// Sent in [`SpineSystem::Update`].
+///
 /// ```
 /// # use bevy::prelude::*;
 /// # use bevy_spine::prelude::*;
