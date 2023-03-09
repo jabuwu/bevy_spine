@@ -13,7 +13,8 @@ use bevy::{
     prelude::*,
     render::{
         mesh::{Indices, MeshVertexAttribute},
-        render_resource::{PrimitiveTopology, VertexFormat},
+        render_resource::{FilterMode, PrimitiveTopology, SamplerDescriptor, VertexFormat},
+        texture::ImageSampler,
     },
     sprite::{Material2dPlugin, Mesh2dHandle},
 };
@@ -22,7 +23,8 @@ use materials::{
     SpineMultiplyPmaMaterial, SpineNormalMaterial, SpineNormalPmaMaterial, SpineScreenMaterial,
     SpineScreenPmaMaterial, SpineShader,
 };
-use rusty_spine::{BlendMode, Skeleton};
+use rusty_spine::{atlas::AtlasFilter, BlendMode, Skeleton};
+use textures::SpineTextureConfig;
 
 use crate::{
     assets::{AtlasLoader, SkeletonJsonLoader},
@@ -57,6 +59,8 @@ pub enum SpineSystem {
     Update,
     /// Updates all Spine meshes and materials for rendering.
     Render,
+    /// Adjusts Spine textures to render properly.
+    AdjustSpineTextures,
 }
 
 /// Helper sets for interacting with Spine systems.
@@ -90,7 +94,6 @@ impl Plugin for SpinePlugin {
             SpineShader::set(
                 shaders.add(Shader::from_wgsl(include_str!("./vertex.wgsl"))),
                 shaders.add(Shader::from_wgsl(include_str!("./fragment.wgsl"))),
-                shaders.add(Shader::from_wgsl(include_str!("./fragment_pma.wgsl"))),
             );
         }
         app.add_plugin(Material2dPlugin::<SpineNormalMaterial>::default())
@@ -138,6 +141,11 @@ impl Plugin for SpinePlugin {
                     .in_set(SpineSystem::SpawnFlush)
                     .after(SpineSystem::Spawn)
                     .before(SpineSystem::Ready),
+            )
+            .add_system(
+                adjust_spine_textures
+                    .in_base_set(CoreSet::PostUpdate)
+                    .in_set(SpineSystem::AdjustSpineTextures),
             );
     }
 }
@@ -881,6 +889,86 @@ fn empty_mesh(mesh: &mut Mesh) {
         MeshVertexAttribute::new("Vertex_DarkColor", 5, VertexFormat::Float32x4),
         dark_colors,
     );
+}
+
+#[derive(Default)]
+struct FixSpineTextures {
+    handles: Vec<(Handle<Image>, SpineTextureConfig)>,
+}
+
+/// Adjusts Spine textures to render properly.
+fn adjust_spine_textures(
+    mut local: Local<FixSpineTextures>,
+    mut spine_texture_create_events: EventReader<SpineTextureCreateEvent>,
+    mut images: ResMut<Assets<Image>>,
+) {
+    use bevy::render::color::Color;
+    for spine_texture_create_event in spine_texture_create_events.iter() {
+        local.handles.push((
+            spine_texture_create_event.handle.clone(),
+            spine_texture_create_event.config,
+        ));
+    }
+    let mut removed_handles = vec![];
+    for (handle_index, (handle, handle_config)) in local.handles.iter().enumerate() {
+        if let Some(image) = images.get_mut(&handle) {
+            fn convert_filter(filter: AtlasFilter) -> FilterMode {
+                match filter {
+                    AtlasFilter::Nearest => FilterMode::Nearest,
+                    AtlasFilter::Linear => FilterMode::Linear,
+                    _ => {
+                        warn!("Unsupported Spine filter: {:?}", filter);
+                        FilterMode::Nearest
+                    }
+                }
+            }
+            image.sampler_descriptor = ImageSampler::Descriptor(SamplerDescriptor {
+                min_filter: convert_filter(handle_config.min_filter),
+                mag_filter: convert_filter(handle_config.mag_filter),
+                ..Default::default()
+            });
+            // The RGB components exported from Spine were premultiplied in nonlinear space, but need to be
+            // multiplied in linear space to render properly in Bevy.
+            if handle_config.premultiplied_alpha {
+                for i in 0..(image.data.len() / 4) {
+                    let mut rgba = Color::rgba_u8(
+                        image.data[i * 4 + 0],
+                        image.data[i * 4 + 1],
+                        image.data[i * 4 + 2],
+                        image.data[i * 4 + 3],
+                    );
+                    if rgba.a() != 0. {
+                        rgba = Color::rgba(
+                            rgba.r() / rgba.a(),
+                            rgba.g() / rgba.a(),
+                            rgba.b() / rgba.a(),
+                            rgba.a(),
+                        );
+                    } else {
+                        rgba = Color::rgba(0., 0., 0., 0.);
+                    }
+                    let mut linear_rgba = rgba.as_linear_rgba_f32();
+                    linear_rgba[0] *= linear_rgba[3];
+                    linear_rgba[1] *= linear_rgba[3];
+                    linear_rgba[2] *= linear_rgba[3];
+                    rgba = Color::rgba_linear(
+                        linear_rgba[0],
+                        linear_rgba[1],
+                        linear_rgba[2],
+                        linear_rgba[3],
+                    )
+                    .as_rgba();
+                    for j in 0..4 {
+                        image.data[i * 4 + j] = (rgba.as_rgba_f32()[j] * 255.) as u8;
+                    }
+                }
+            }
+            removed_handles.push(handle_index);
+        }
+    }
+    for removed_handle in removed_handles.into_iter().rev() {
+        local.handles.remove(removed_handle);
+    }
 }
 
 mod assets;

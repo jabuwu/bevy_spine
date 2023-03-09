@@ -3,6 +3,7 @@
 use std::sync::{Arc, Mutex};
 
 use bevy::prelude::*;
+use rusty_spine::atlas::AtlasFilter;
 
 use crate::Atlas;
 
@@ -13,6 +14,14 @@ pub(crate) struct SpineTexture(pub String);
 struct SpineTextureInternal {
     pub path: String,
     pub atlas_address: usize,
+    pub config: SpineTextureConfig,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct SpineTextureConfig {
+    pub premultiplied_alpha: bool,
+    pub min_filter: AtlasFilter,
+    pub mag_filter: AtlasFilter,
 }
 
 #[derive(Resource)]
@@ -28,6 +37,7 @@ pub struct SpineTextureCreateEvent {
     pub path: String,
     pub handle: Handle<Image>,
     pub atlas: Handle<Atlas>,
+    pub config: SpineTextureConfig,
 }
 
 /// An [`Event`] fired for each texture disposed, after [`SpineTextureCreateEvent`].
@@ -43,7 +53,7 @@ pub struct SpineTextureDisposeEvent {
 pub(crate) struct SpineTexturesData {
     handles: Vec<(String, Handle<Image>)>,
     remember: Vec<SpineTextureInternal>,
-    forget: Vec<SpineTextureInternal>,
+    forget: Vec<String>,
 }
 
 impl SpineTextures {
@@ -55,20 +65,23 @@ impl SpineTextures {
             data2.lock().unwrap().remember.push(SpineTextureInternal {
                 path: path.to_owned(),
                 atlas_address: page.atlas().c_ptr() as usize,
+                config: SpineTextureConfig {
+                    premultiplied_alpha: page.pma(),
+                    min_filter: page.min_filter(),
+                    mag_filter: page.mag_filter(),
+                },
             });
             page.renderer_object().set(SpineTexture(path.to_owned()));
         });
 
         let data3 = data.clone();
         rusty_spine::extension::set_dispose_texture_cb(move |page| unsafe {
-            data3.lock().unwrap().forget.push(SpineTextureInternal {
-                path: page
-                    .renderer_object()
+            data3.lock().unwrap().forget.push(
+                page.renderer_object()
                     .get_unchecked::<SpineTexture>()
                     .0
                     .clone(),
-                atlas_address: page.atlas().c_ptr() as usize,
-            });
+            );
             page.renderer_object().dispose::<SpineTexture>();
         });
 
@@ -92,13 +105,14 @@ impl SpineTextures {
                     path: texture.path,
                     atlas,
                     handle,
+                    config: texture.config,
                 });
             }
         }
-        while let Some(texture) = data.forget.pop() {
-            if let Some(index) = data.handles.iter().position(|i| i.0 == texture.path) {
+        while let Some(texture_path) = data.forget.pop() {
+            if let Some(index) = data.handles.iter().position(|i| i.0 == texture_path) {
                 dispose_events.send(SpineTextureDisposeEvent {
-                    path: texture.path,
+                    path: texture_path,
                     handle: data.handles[index].1.clone(),
                 });
                 data.handles.remove(index);

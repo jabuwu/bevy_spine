@@ -20,7 +20,6 @@ use bevy::{
 pub(crate) struct SpineShader {
     vertex: Handle<Shader>,
     fragment: Handle<Shader>,
-    fragment_pma: Handle<Shader>,
 }
 
 impl SpineShader {
@@ -36,16 +35,11 @@ impl SpineShader {
         }
     }
 
-    pub(crate) fn set(
-        vertex: Handle<Shader>,
-        fragment: Handle<Shader>,
-        fragment_pma: Handle<Shader>,
-    ) {
+    pub(crate) fn set(vertex: Handle<Shader>, fragment: Handle<Shader>) {
         let singleton = SpineShader::singleton();
         let mut shaders = singleton.lock().unwrap();
         shaders.vertex = vertex;
         shaders.fragment = fragment;
-        shaders.fragment_pma = fragment_pma;
     }
 
     pub(crate) fn get_vertex() -> Handle<Shader> {
@@ -55,18 +49,10 @@ impl SpineShader {
     pub(crate) fn get_fragment() -> Handle<Shader> {
         SpineShader::singleton().lock().unwrap().fragment.clone()
     }
-
-    pub(crate) fn get_fragment_pma() -> Handle<Shader> {
-        SpineShader::singleton()
-            .lock()
-            .unwrap()
-            .fragment_pma
-            .clone()
-    }
 }
 
 macro_rules! material {
-    ($(#[$($attrss:tt)*])* $uuid:literal, $name:ident, $shader:expr, $blend_state:expr) => {
+    ($(#[$($attrss:tt)*])* $uuid:literal, $name:ident, $blend_state:expr) => {
         $(#[$($attrss)*])*
         #[derive(AsBindGroup, TypeUuid, Clone)]
         #[uuid = $uuid]
@@ -88,7 +74,7 @@ macro_rules! material {
             }
 
             fn fragment_shader() -> ShaderRef {
-                $shader.into()
+                SpineShader::get_fragment().into()
             }
 
             fn specialize(
@@ -119,7 +105,6 @@ material!(
     /// Normal blend mode material, non-premultiplied-alpha
     "22413663-46b0-4b9b-b714-d72fb87dc7ef",
     SpineNormalMaterial,
-    SpineShader::get_fragment(),
     BlendState {
         color: BlendComponent {
             src_factor: BlendFactor::SrcAlpha,
@@ -138,7 +123,6 @@ material!(
     /// Additive blend mode material, non-premultiplied-alpha
     "092d3b15-c3b4-45d6-95fd-3a24a86e08d7",
     SpineAdditiveMaterial,
-    SpineShader::get_fragment(),
     BlendState {
         color: BlendComponent {
             src_factor: BlendFactor::SrcAlpha,
@@ -157,7 +141,6 @@ material!(
     /// Multiply blend mode material, non-premultiplied-alpha
     "ec4d2018-ad8f-4ff8-bbf7-33f13dab7ef3",
     SpineMultiplyMaterial,
-    SpineShader::get_fragment(),
     BlendState {
         color: BlendComponent {
             src_factor: BlendFactor::Dst,
@@ -176,7 +159,6 @@ material!(
     /// Screen blend mode material, non-premultiplied-alpha
     "5d357844-6a06-4238-aaef-9da95186590b",
     SpineScreenMaterial,
-    SpineShader::get_fragment(),
     BlendState {
         color: BlendComponent {
             src_factor: BlendFactor::One,
@@ -195,7 +177,6 @@ material!(
     /// Normal blend mode material, premultiplied-alpha
     "296e2f58-f5f0-4a51-9f4b-dbcec06ddc04",
     SpineNormalPmaMaterial,
-    SpineShader::get_fragment_pma(),
     BlendState {
         color: BlendComponent {
             src_factor: BlendFactor::One,
@@ -214,7 +195,6 @@ material!(
     /// Additive blend mode material, premultiplied-alpha
     "0f546186-4e05-434b-a0e1-3e1454b2cc7a",
     SpineAdditivePmaMaterial,
-    SpineShader::get_fragment_pma(),
     BlendState {
         color: BlendComponent {
             src_factor: BlendFactor::One,
@@ -233,7 +213,6 @@ material!(
     /// Multiple blend mode material, premultiplied-alpha
     "d8ef56cf-88b9-46f8-971b-7583baf8c20b",
     SpineMultiplyPmaMaterial,
-    SpineShader::get_fragment_pma(),
     BlendState {
         color: BlendComponent {
             src_factor: BlendFactor::Dst,
@@ -252,7 +231,6 @@ material!(
     /// Screen blend mode material, premultiplied-alpha
     "1cd4d391-e106-4585-928f-124f998f28b6",
     SpineScreenPmaMaterial,
-    SpineShader::get_fragment_pma(),
     BlendState {
         color: BlendComponent {
             src_factor: BlendFactor::One,

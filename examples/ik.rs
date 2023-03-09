@@ -23,7 +23,7 @@ fn setup(
 
     let skeleton = SkeletonData::new_from_json(
         asset_server.load("spineboy/export/spineboy-pro.json"),
-        asset_server.load("spineboy/export/spineboy.atlas"),
+        asset_server.load("spineboy/export/spineboy-pma.atlas"),
     );
     let skeleton_handle = skeletons.add(skeleton);
 
