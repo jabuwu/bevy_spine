@@ -19,6 +19,7 @@ bevy_math = { version = "0.10", features = [ "mint" ] }
 [dev-dependencies]
 lerp = "0.4"
 bevy = { version = "0.10", default-features = true }
+bevy_fly_camera = "0.10"
 
 [features]
 workaround_5732 = [] # enable to workaround Bevy issue #5732

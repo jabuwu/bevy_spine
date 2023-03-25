@@ -12,8 +12,8 @@ fn main() {
         .add_system(on_spawn.in_set(SpineSet::OnReady))
         .add_system(
             crossfades
-                .after(SpineSystem::Update)
-                .before(SpineSystem::Render),
+                .after(SpineSystem::UpdateAnimation)
+                .before(SpineSystem::UpdateMeshes),
         )
         .run();
 }
