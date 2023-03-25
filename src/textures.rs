@@ -3,7 +3,7 @@
 use std::sync::{Arc, Mutex};
 
 use bevy::prelude::*;
-use rusty_spine::atlas::AtlasFilter;
+use rusty_spine::atlas::{AtlasFilter, AtlasWrap};
 
 use crate::Atlas;
 
@@ -22,6 +22,8 @@ pub struct SpineTextureConfig {
     pub premultiplied_alpha: bool,
     pub min_filter: AtlasFilter,
     pub mag_filter: AtlasFilter,
+    pub u_wrap: AtlasWrap,
+    pub v_wrap: AtlasWrap,
 }
 
 #[derive(Resource)]
@@ -69,6 +71,8 @@ impl SpineTextures {
                     premultiplied_alpha: page.pma(),
                     min_filter: page.min_filter(),
                     mag_filter: page.mag_filter(),
+                    u_wrap: page.u_wrap(),
+                    v_wrap: page.v_wrap(),
                 },
             });
             page.renderer_object().set(SpineTexture(path.to_owned()));

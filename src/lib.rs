@@ -13,7 +13,9 @@ use bevy::{
     prelude::*,
     render::{
         mesh::{Indices, MeshVertexAttribute},
-        render_resource::{FilterMode, PrimitiveTopology, SamplerDescriptor, VertexFormat},
+        render_resource::{
+            AddressMode, FilterMode, PrimitiveTopology, SamplerDescriptor, VertexFormat,
+        },
         texture::ImageSampler,
     },
     sprite::{Material2dPlugin, Mesh2dHandle},
@@ -23,7 +25,10 @@ use materials::{
     SpineMultiplyPmaMaterial, SpineNormalMaterial, SpineNormalPmaMaterial, SpineScreenMaterial,
     SpineScreenPmaMaterial, SpineShader,
 };
-use rusty_spine::{atlas::AtlasFilter, BlendMode, Skeleton};
+use rusty_spine::{
+    atlas::{AtlasFilter, AtlasWrap},
+    BlendMode, Skeleton,
+};
 use textures::SpineTextureConfig;
 
 use crate::{
@@ -922,9 +927,22 @@ fn adjust_spine_textures(
                     }
                 }
             }
+            fn convert_wrap(wrap: AtlasWrap) -> AddressMode {
+                match wrap {
+                    AtlasWrap::ClampToEdge => AddressMode::ClampToEdge,
+                    AtlasWrap::MirroredRepeat => AddressMode::MirrorRepeat,
+                    AtlasWrap::Repeat => AddressMode::Repeat,
+                    _ => {
+                        warn!("Unsupported Spine wrap mode: {:?}", wrap);
+                        AddressMode::ClampToEdge
+                    }
+                }
+            }
             image.sampler_descriptor = ImageSampler::Descriptor(SamplerDescriptor {
                 min_filter: convert_filter(handle_config.min_filter),
                 mag_filter: convert_filter(handle_config.mag_filter),
+                address_mode_u: convert_wrap(handle_config.u_wrap),
+                address_mode_v: convert_wrap(handle_config.v_wrap),
                 ..Default::default()
             });
             // The RGB components exported from Spine were premultiplied in nonlinear space, but need to be
