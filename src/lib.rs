@@ -10,6 +10,7 @@ use std::{
 };
 
 use bevy::{
+    asset::load_internal_binary_asset,
     prelude::*,
     render::{
         mesh::{Indices, MeshVertexAttribute},
@@ -23,7 +24,7 @@ use bevy::{
 use materials::{
     SpineAdditiveMaterial, SpineAdditivePmaMaterial, SpineMultiplyMaterial,
     SpineMultiplyPmaMaterial, SpineNormalMaterial, SpineNormalPmaMaterial, SpineScreenMaterial,
-    SpineScreenPmaMaterial, SpineShader,
+    SpineScreenPmaMaterial,
 };
 use rusty_spine::{
     atlas::{AtlasFilter, AtlasWrap},
@@ -33,6 +34,7 @@ use textures::SpineTextureConfig;
 
 use crate::{
     assets::{AtlasLoader, SkeletonJsonLoader},
+    materials::{FRAGMENT_SHADER_HANDLE, VERTEX_SHADER_HANDLE},
     rusty_spine::{
         controller::SkeletonControllerSettings, draw::CullDirection, AnimationStateData,
         BoneHandle, EventType,
@@ -94,13 +96,6 @@ pub struct SpinePlugin;
 
 impl Plugin for SpinePlugin {
     fn build(&self, app: &mut App) {
-        {
-            let mut shaders = app.world.resource_mut::<Assets<Shader>>();
-            SpineShader::set(
-                shaders.add(Shader::from_wgsl(include_str!("./vertex.wgsl"))),
-                shaders.add(Shader::from_wgsl(include_str!("./fragment.wgsl"))),
-            );
-        }
         app.add_plugin(Material2dPlugin::<SpineNormalMaterial>::default())
             .add_plugin(Material2dPlugin::<SpineAdditiveMaterial>::default())
             .add_plugin(Material2dPlugin::<SpineMultiplyMaterial>::default())
@@ -152,6 +147,19 @@ impl Plugin for SpinePlugin {
                     .in_base_set(CoreSet::PostUpdate)
                     .in_set(SpineSystem::AdjustSpineTextures),
             );
+
+        load_internal_binary_asset!(
+            app,
+            VERTEX_SHADER_HANDLE,
+            "vertex.wgsl",
+            |bytes: &[u8]| Shader::from_wgsl(std::str::from_utf8(bytes).unwrap().to_owned())
+        );
+        load_internal_binary_asset!(
+            app,
+            FRAGMENT_SHADER_HANDLE,
+            "fragment.wgsl",
+            |bytes: &[u8]| Shader::from_wgsl(std::str::from_utf8(bytes).unwrap().to_owned())
+        );
     }
 }
 
