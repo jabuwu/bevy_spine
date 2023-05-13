@@ -10,7 +10,7 @@ fn main() {
         .add_plugin(SpinePlugin)
         .add_startup_system(setup)
         .add_system(on_spawn.in_set(SpineSet::OnReady))
-        .add_system(on_spine_event)
+        .add_system(on_spine_event.in_set(SpineSet::OnEvent))
         .add_system(footstep_update)
         .run();
 }
