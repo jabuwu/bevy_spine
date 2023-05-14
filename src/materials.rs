@@ -1,7 +1,5 @@
 //! Materials for Spine blend modes.
 
-use std::sync::{Arc, Mutex, Once};
-
 use bevy::{
     prelude::*,
     reflect::TypeUuid,
@@ -16,40 +14,10 @@ use bevy::{
     sprite::{Material2d, Material2dKey},
 };
 
-#[derive(Default)]
-pub(crate) struct SpineShader {
-    vertex: Handle<Shader>,
-    fragment: Handle<Shader>,
-}
-
-impl SpineShader {
-    fn singleton() -> Arc<Mutex<SpineShader>> {
-        static START: Once = Once::new();
-        static mut INSTANCE: Option<Arc<Mutex<SpineShader>>> = None;
-        START.call_once(|| unsafe {
-            INSTANCE = Some(Arc::new(Mutex::new(SpineShader::default())));
-        });
-        unsafe {
-            let singleton = INSTANCE.as_ref().unwrap();
-            singleton.clone()
-        }
-    }
-
-    pub(crate) fn set(vertex: Handle<Shader>, fragment: Handle<Shader>) {
-        let singleton = SpineShader::singleton();
-        let mut shaders = singleton.lock().unwrap();
-        shaders.vertex = vertex;
-        shaders.fragment = fragment;
-    }
-
-    pub(crate) fn get_vertex() -> Handle<Shader> {
-        SpineShader::singleton().lock().unwrap().vertex.clone()
-    }
-
-    pub(crate) fn get_fragment() -> Handle<Shader> {
-        SpineShader::singleton().lock().unwrap().fragment.clone()
-    }
-}
+pub const VERTEX_SHADER_HANDLE: HandleUntyped =
+    HandleUntyped::weak_from_u64(Shader::TYPE_UUID, 10655547040990968849);
+pub const FRAGMENT_SHADER_HANDLE: HandleUntyped =
+    HandleUntyped::weak_from_u64(Shader::TYPE_UUID, 10048211129967055809);
 
 macro_rules! material {
     ($(#[$($attrss:tt)*])* $uuid:literal, $name:ident, $blend_state:expr) => {
@@ -70,11 +38,11 @@ macro_rules! material {
 
         impl Material2d for $name {
             fn vertex_shader() -> ShaderRef {
-                SpineShader::get_vertex().into()
+                VERTEX_SHADER_HANDLE.typed().into()
             }
 
             fn fragment_shader() -> ShaderRef {
-                SpineShader::get_fragment().into()
+                FRAGMENT_SHADER_HANDLE.typed().into()
             }
 
             fn specialize(

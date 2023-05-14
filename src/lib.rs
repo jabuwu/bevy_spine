@@ -9,6 +9,7 @@ use std::{
 };
 
 use bevy::{
+    asset::load_internal_binary_asset,
     prelude::*,
     render::{
         mesh::{Indices, MeshVertexAttribute},
@@ -22,7 +23,7 @@ use bevy::{
 use materials::{
     SpineAdditiveMaterial, SpineAdditivePmaMaterial, SpineMultiplyMaterial,
     SpineMultiplyPmaMaterial, SpineNormalMaterial, SpineNormalPmaMaterial, SpineScreenMaterial,
-    SpineScreenPmaMaterial, SpineShader,
+    SpineScreenPmaMaterial,
 };
 use rusty_spine::{
     atlas::{AtlasFilter, AtlasWrap},
@@ -32,6 +33,7 @@ use textures::SpineTextureConfig;
 
 use crate::{
     assets::{AtlasLoader, SkeletonJsonLoader},
+    materials::{FRAGMENT_SHADER_HANDLE, VERTEX_SHADER_HANDLE},
     rusty_spine::{
         controller::SkeletonControllerSettings, draw::CullDirection, AnimationStateData,
         BoneHandle, EventType,
@@ -72,12 +74,15 @@ pub enum SpineSystem {
 /// Helper sets for interacting with Spine systems.
 #[derive(Debug, Hash, PartialEq, Eq, Clone, Copy, SystemSet)]
 pub enum SpineSet {
-    /// A helper Set which systems can be added into, occuring after [`SpineSystem::Ready`] but
-    /// before [`SpineSystem::Update`], so that entities can configure a newly spawned skeleton
-    /// before they are updated for the first time.
+    /// A helper Set occuring after [`SpineSystem::Ready`] but before Spine update systems, so that
+    /// systems can configure a newly spawned skeleton before they are updated for the first time.
     OnReady,
-    /// A helper Set which systems can be added into, occuring after [`SpineSystem::UpdateMeshes`]
-    /// to allow adjusting custom materials on [`SpineMesh`] entities.
+    /// A helper Set occuring after [`SpineSystem::UpdateAnimation`] but before
+    /// [`SpineSystem::UpdateMeshes`], so that systems can handle events immediately after the
+    /// skeleton updates but before it renders.
+    OnEvent,
+    /// A helper Set occuring after [`SpineSystem::UpdateMeshes`] to allow adjusting custom
+    /// materials on [`SpineMesh`] entities.
     OnUpdateMaterials,
 }
 
@@ -98,13 +103,6 @@ pub struct SpinePlugin;
 
 impl Plugin for SpinePlugin {
     fn build(&self, app: &mut App) {
-        {
-            let mut shaders = app.world.resource_mut::<Assets<Shader>>();
-            SpineShader::set(
-                shaders.add(Shader::from_wgsl(include_str!("./vertex.wgsl"))),
-                shaders.add(Shader::from_wgsl(include_str!("./fragment.wgsl"))),
-            );
-        }
         app.add_plugin(Material2dPlugin::<SpineNormalMaterial>::default())
             .add_plugin(Material2dPlugin::<SpineAdditiveMaterial>::default())
             .add_plugin(Material2dPlugin::<SpineMultiplyMaterial>::default())
@@ -114,6 +112,7 @@ impl Plugin for SpinePlugin {
             .add_plugin(Material2dPlugin::<SpineMultiplyPmaMaterial>::default())
             .add_plugin(Material2dPlugin::<SpineScreenPmaMaterial>::default())
             .add_plugin(SpineSyncPlugin::first())
+            .init_resource::<SpineEventQueue>()
             .insert_resource(SpineTextures::init())
             .insert_resource(SpineReadyEvents::default())
             .add_event::<SpineTextureCreateEvent>()
@@ -142,12 +141,14 @@ impl Plugin for SpinePlugin {
             .add_system(
                 spine_update_animation
                     .in_set(SpineSystem::UpdateAnimation)
-                    .after(SpineSet::OnReady),
+                    .after(SpineSet::OnReady)
+                    .before(SpineSet::OnEvent),
             )
             .add_system(
                 spine_update_meshes
                     .in_set(SpineSystem::UpdateMeshes)
-                    .after(SpineSystem::UpdateAnimation),
+                    .after(SpineSystem::UpdateAnimation)
+                    .after(SpineSet::OnEvent),
             )
             .add_system(
                 spine_update_materials
@@ -166,8 +167,24 @@ impl Plugin for SpinePlugin {
                     .in_base_set(CoreSet::PostUpdate)
                     .in_set(SpineSystem::AdjustSpineTextures),
             );
+
+        load_internal_binary_asset!(
+            app,
+            VERTEX_SHADER_HANDLE,
+            "vertex.wgsl",
+            |bytes: &[u8]| Shader::from_wgsl(std::str::from_utf8(bytes).unwrap().to_owned())
+        );
+        load_internal_binary_asset!(
+            app,
+            FRAGMENT_SHADER_HANDLE,
+            "fragment.wgsl",
+            |bytes: &[u8]| Shader::from_wgsl(std::str::from_utf8(bytes).unwrap().to_owned())
+        );
     }
 }
+
+#[derive(Resource, Default)]
+struct SpineEventQueue(Arc<Mutex<VecDeque<SpineEvent>>>);
 
 /// A live Spine [`SkeletonController`] [`Component`], ready to be manipulated.
 ///
@@ -567,6 +584,7 @@ fn spine_spawn(
     mut meshes: ResMut<Assets<Mesh>>,
     mut ready_events: ResMut<SpineReadyEvents>,
     mut skeleton_data_assets: ResMut<Assets<SkeletonData>>,
+    spine_event_queue: Res<SpineEventQueue>,
 ) {
     for (mut spine_loader, entity, data_handle, crossfades) in skeleton_query.iter_mut() {
         if let SpineLoader::Loading { with_children } = spine_loader.as_ref() {
@@ -590,6 +608,61 @@ fn spine_spawn(
                         SkeletonControllerSettings::new()
                             .with_cull_direction(CullDirection::CounterClockwise)
                             .with_premultiplied_alpha(skeleton_data_asset.premultiplied_alpha),
+                    );
+                    let events = spine_event_queue.0.clone();
+                    controller.animation_state.set_listener(
+                        move |_animation_state, event_type, track_entry, spine_event| {
+                            match event_type {
+                                EventType::Start => {
+                                    let mut events = events.lock().unwrap();
+                                    events.push_back(SpineEvent::Start {
+                                        entity,
+                                        animation: track_entry.animation().name().to_owned(),
+                                    });
+                                }
+                                EventType::Interrupt => {
+                                    let mut events = events.lock().unwrap();
+                                    events.push_back(SpineEvent::Interrupt {
+                                        entity,
+                                        animation: track_entry.animation().name().to_owned(),
+                                    });
+                                }
+                                EventType::End => {
+                                    let mut events = events.lock().unwrap();
+                                    events.push_back(SpineEvent::End {
+                                        entity,
+                                        animation: track_entry.animation().name().to_owned(),
+                                    });
+                                }
+                                EventType::Complete => {
+                                    let mut events = events.lock().unwrap();
+                                    events.push_back(SpineEvent::Complete {
+                                        entity,
+                                        animation: track_entry.animation().name().to_owned(),
+                                    });
+                                }
+                                EventType::Dispose => {
+                                    let mut events = events.lock().unwrap();
+                                    events.push_back(SpineEvent::Dispose { entity });
+                                }
+                                EventType::Event => {
+                                    if let Some(spine_event) = spine_event {
+                                        let mut events = events.lock().unwrap();
+                                        events.push_back(SpineEvent::Event {
+                                            entity,
+                                            name: spine_event.data().name().to_owned(),
+                                            int: spine_event.int_value(),
+                                            float: spine_event.float_value(),
+                                            string: spine_event.string_value().to_owned(),
+                                            audio_path: spine_event.data().audio_path().to_owned(),
+                                            volume: spine_event.volume(),
+                                            balance: spine_event.balance(),
+                                        });
+                                    }
+                                }
+                                _ => {}
+                            }
+                        },
                     );
                     controller.skeleton.set_to_setup_pose();
                     let mut bones = HashMap::new();
@@ -690,80 +763,17 @@ fn spine_ready(
     }
 }
 
-#[derive(Default)]
-struct SpineUpdateLocal {
-    events: Arc<Mutex<VecDeque<SpineEvent>>>,
-}
-
 fn spine_update_animation(
     mut spine_query: Query<(Entity, &mut Spine)>,
-    mut spine_ready_events: EventReader<SpineReadyEvent>,
     mut spine_events: EventWriter<SpineEvent>,
     time: Res<Time>,
-    local: Local<SpineUpdateLocal>,
+    spine_event_queue: Res<SpineEventQueue>,
 ) {
-    for event in spine_ready_events.iter() {
-        if let Ok((entity, mut spine)) = spine_query.get_mut(event.entity) {
-            let events = local.events.clone();
-            spine.animation_state.set_listener(
-                move |_animation_state, event_type, track_entry, spine_event| match event_type {
-                    EventType::Start => {
-                        let mut events = events.lock().unwrap();
-                        events.push_back(SpineEvent::Start {
-                            entity,
-                            animation: track_entry.animation().name().to_owned(),
-                        });
-                    }
-                    EventType::Interrupt => {
-                        let mut events = events.lock().unwrap();
-                        events.push_back(SpineEvent::Interrupt {
-                            entity,
-                            animation: track_entry.animation().name().to_owned(),
-                        });
-                    }
-                    EventType::End => {
-                        let mut events = events.lock().unwrap();
-                        events.push_back(SpineEvent::End {
-                            entity,
-                            animation: track_entry.animation().name().to_owned(),
-                        });
-                    }
-                    EventType::Complete => {
-                        let mut events = events.lock().unwrap();
-                        events.push_back(SpineEvent::Complete {
-                            entity,
-                            animation: track_entry.animation().name().to_owned(),
-                        });
-                    }
-                    EventType::Dispose => {
-                        let mut events = events.lock().unwrap();
-                        events.push_back(SpineEvent::Dispose { entity });
-                    }
-                    EventType::Event => {
-                        if let Some(spine_event) = spine_event {
-                            let mut events = events.lock().unwrap();
-                            events.push_back(SpineEvent::Event {
-                                entity,
-                                name: spine_event.data().name().to_owned(),
-                                int: spine_event.int_value(),
-                                float: spine_event.float_value(),
-                                string: spine_event.string_value().to_owned(),
-                                audio_path: spine_event.data().audio_path().to_owned(),
-                                volume: spine_event.volume(),
-                                balance: spine_event.balance(),
-                            });
-                        }
-                    }
-                    _ => {}
-                },
-            );
-        }
-    }
     for (_, mut spine) in spine_query.iter_mut() {
         spine.update(time.delta_seconds());
     }
     {
-        let mut events = local.events.lock().unwrap();
+        let mut events = spine_event_queue.0.lock().unwrap();
         while let Some(event) = events.pop_front() {
             spine_events.send(event);
         }
