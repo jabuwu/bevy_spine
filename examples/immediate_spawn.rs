@@ -18,7 +18,7 @@ fn main() {
         .add_system(
             on_spawn
                 .after(SpineSystem::Ready)
-                .before(SpineSystem::Update),
+                .before(SpineSystem::UpdateAnimation),
         )
         .add_system(
             apply_system_buffers

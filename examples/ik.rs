@@ -10,7 +10,10 @@ fn main() {
         .add_plugin(SpinePlugin)
         .add_startup_system(setup)
         .add_system(on_spawn.in_set(SpineSet::OnReady))
-        .add_system(ik.after(SpineSystem::Update).before(SpineSystem::Render))
+        .add_system(
+            ik.after(SpineSystem::UpdateAnimation)
+                .before(SpineSystem::UpdateMeshes),
+        )
         .run();
 }
 

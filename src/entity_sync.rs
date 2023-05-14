@@ -107,7 +107,7 @@ where
 impl<T: SpineSynchronizer> SpineSynchronizerPlugin<T, SpineSystem> {
     pub(crate) fn first() -> Self {
         Self {
-            after: SpineSystem::Update,
+            after: SpineSystem::UpdateAnimation,
             _marker: Default::default(),
         }
     }
@@ -133,7 +133,7 @@ impl<T: SpineSynchronizer, A: SystemSet + Copy> Plugin for SpineSynchronizerPlug
                 .in_set(SpineSynchronizerSystem::<T>::SyncEntitiesApplied)
                 .after(SpineSynchronizerSystem::<T>::SyncBones)
                 .before(SpineSynchronizerSet::<T>::AfterSync)
-                .before(SpineSystem::Render),
+                .before(SpineSystem::UpdateMeshes),
         );
     }
 }
