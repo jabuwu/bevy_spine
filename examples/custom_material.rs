@@ -86,12 +86,8 @@ pub struct MyMaterial {
     #[texture(0)]
     #[sampler(1)]
     pub image: Handle<Image>,
-}
-
-impl MyMaterial {
-    pub fn new(image: Handle<Image>) -> Self {
-        Self { image }
-    }
+    #[uniform(2)]
+    pub time: f32,
 }
 
 impl Material2d for MyMaterial {
@@ -123,6 +119,7 @@ impl Material2d for MyMaterial {
 #[derive(SystemParam)]
 pub struct MyMaterialParam<'w, 's> {
     my_spine_query: Query<'w, 's, &'static MySpine>,
+    time: Res<'w, Time>,
 }
 
 impl SpineMaterial for MyMaterial {
@@ -138,6 +135,7 @@ impl SpineMaterial for MyMaterial {
         if params.my_spine_query.contains(entity) {
             let mut material = material.unwrap_or_else(|| Self::default());
             material.image = renderable_data.texture;
+            material.time = params.time.elapsed_seconds();
             Some(material)
         } else {
             None
