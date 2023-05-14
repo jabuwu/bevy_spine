@@ -1,4 +1,5 @@
 use bevy::{
+    ecs::system::{StaticSystemParam, SystemParam},
     prelude::*,
     reflect::TypeUuid,
     render::{
@@ -11,8 +12,9 @@ use bevy::{
     sprite::{Material2d, Material2dKey, Material2dPlugin},
 };
 use bevy_spine::{
-    SkeletonController, SkeletonData, Spine, SpineBundle, SpineMesh, SpineMeshState, SpinePlugin,
-    SpineReadyEvent, SpineSet, SpineSettings,
+    materials::{SpineMaterial, SpineMaterialPlugin},
+    SkeletonController, SkeletonData, Spine, SpineBundle, SpinePlugin, SpineReadyEvent,
+    SpineRenderableData, SpineSet, SpineSettings,
 };
 
 fn main() {
@@ -20,9 +22,9 @@ fn main() {
         .add_plugins(DefaultPlugins)
         .add_plugin(SpinePlugin)
         .add_plugin(Material2dPlugin::<MyMaterial>::default())
+        .add_plugin(SpineMaterialPlugin::<MyMaterial>::default())
         .add_startup_system(setup)
         .add_system(on_spawn.in_set(SpineSet::OnReady))
-        .add_system(update_materials)
         .run();
 }
 
@@ -75,40 +77,10 @@ fn on_spawn(
     }
 }
 
-#[allow(clippy::type_complexity, clippy::too_many_arguments)]
-fn update_materials(
-    mut commands: Commands,
-    mut spine_query: Query<&Children, (With<Spine>, With<MySpine>)>,
-    mut materials: ResMut<Assets<MyMaterial>>,
-    mesh_query: Query<(Entity, &SpineMesh, Option<&Handle<MyMaterial>>)>,
-) {
-    for spine_children in spine_query.iter_mut() {
-        for child in spine_children.iter() {
-            if let Ok((mesh_entity, spine_mesh, material_handle)) = mesh_query.get(*child) {
-                let SpineMeshState::Renderable { texture, .. } = spine_mesh.state.clone() else {
-                    continue;
-                };
-                let handle = if let Some(handle) = material_handle {
-                    handle.clone()
-                } else {
-                    let handle = materials.add(MyMaterial::new(texture.clone()));
-                    if let Some(mut entity_commands) = commands.get_entity(mesh_entity) {
-                        entity_commands.insert(handle.clone());
-                    }
-                    handle
-                };
-                if let Some(material) = materials.get_mut(&handle) {
-                    material.image = texture.clone();
-                }
-            }
-        }
-    }
-}
-
 #[derive(Component)]
 pub struct MySpine;
 
-#[derive(AsBindGroup, TypeUuid, Clone)]
+#[derive(AsBindGroup, TypeUuid, Clone, Default)]
 #[uuid = "2e85f9ae-049a-4bb5-9f5d-ebaaa208df60"]
 pub struct MyMaterial {
     #[texture(0)]
@@ -145,5 +117,30 @@ impl Material2d for MyMaterial {
             });
         descriptor.primitive.cull_mode = None;
         Ok(())
+    }
+}
+
+#[derive(SystemParam)]
+pub struct MyMaterialParam<'w, 's> {
+    my_spine_query: Query<'w, 's, &'static MySpine>,
+}
+
+impl SpineMaterial for MyMaterial {
+    type Material = Self;
+    type Params<'w, 's> = MyMaterialParam<'w, 's>;
+
+    fn update<'w, 's>(
+        material: Option<Self>,
+        entity: Entity,
+        renderable_data: SpineRenderableData,
+        params: &StaticSystemParam<Self::Params<'w, 's>>,
+    ) -> Option<Self> {
+        if params.my_spine_query.contains(entity) {
+            let mut material = material.unwrap_or_else(|| Self::default());
+            material.image = renderable_data.texture;
+            Some(material)
+        } else {
+            None
+        }
     }
 }

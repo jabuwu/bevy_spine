@@ -1,9 +1,14 @@
 use bevy::{
+    ecs::system::StaticSystemParam,
     input::mouse::MouseMotion,
     prelude::*,
     window::{CursorGrabMode, PrimaryWindow},
 };
-use bevy_spine::prelude::*;
+use bevy_spine::{
+    materials::{SpineMaterial, SpineMaterialPlugin, SpineSettingsQuery},
+    prelude::*,
+    SpineRenderableData,
+};
 
 #[derive(Component)]
 pub struct Orbit {
@@ -24,9 +29,9 @@ fn main() {
     App::new()
         .add_plugins(DefaultPlugins)
         .add_plugin(SpinePlugin)
+        .add_plugin(SpineMaterialPlugin::<Spine3DMaterial>::default())
         .add_startup_system(setup)
         .add_system(on_spawn.in_set(SpineSet::OnReady))
-        .add_system(update_materials.in_set(SpineSet::OnUpdateMaterials))
         .add_system(controls)
         .run();
 }
@@ -97,40 +102,6 @@ fn on_spawn(
     }
 }
 
-#[allow(clippy::type_complexity, clippy::too_many_arguments)]
-fn update_materials(
-    mut commands: Commands,
-    mut spine_query: Query<&Children, With<Spine>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
-    mesh_query: Query<(Entity, &SpineMesh, Option<&Handle<StandardMaterial>>)>,
-) {
-    for spine_children in spine_query.iter_mut() {
-        for child in spine_children.iter() {
-            if let Ok((mesh_entity, spine_mesh, material_handle)) = mesh_query.get(*child) {
-                let SpineMeshState::Renderable { texture, .. } = spine_mesh.state.clone() else {
-                    continue;
-                };
-                let handle = if let Some(handle) = material_handle {
-                    handle.clone()
-                } else {
-                    let handle = materials.add(StandardMaterial {
-                        unlit: true,
-                        alpha_mode: AlphaMode::Premultiplied,
-                        ..Default::default()
-                    });
-                    if let Some(mut entity_commands) = commands.get_entity(mesh_entity) {
-                        entity_commands.insert(handle.clone());
-                    }
-                    handle
-                };
-                if let Some(material) = materials.get_mut(&handle) {
-                    material.base_color_texture = Some(texture.clone());
-                }
-            }
-        }
-    }
-}
-
 fn controls(
     mut window_query: Query<&mut Window, With<PrimaryWindow>>,
     mut mouse_motion_events: EventReader<MouseMotion>,
@@ -160,5 +131,41 @@ fn controls(
         orbit_transform.translation =
             Vec3::new(orbit.angle.cos(), orbit.pitch.tan(), orbit.angle.sin()).normalize() * 7.;
         orbit_transform.look_at(Vec3::new(0., 1.5, 0.), Vec3::Y);
+    }
+}
+
+#[derive(Component)]
+pub struct Spine3DMaterial(StandardMaterial);
+
+impl SpineMaterial for Spine3DMaterial {
+    type Material = StandardMaterial;
+    type Params<'w, 's> = SpineSettingsQuery<'w, 's>;
+
+    fn update<'w, 's>(
+        material: Option<Self::Material>,
+        entity: Entity,
+        renderable_data: SpineRenderableData,
+        params: &StaticSystemParam<Self::Params<'w, 's>>,
+    ) -> Option<Self::Material> {
+        let spine_settings = params
+            .spine_settings_query
+            .get(entity)
+            .copied()
+            .unwrap_or(SpineSettings::default());
+        if spine_settings.use_3d_mesh {
+            let mut material = material.unwrap_or_else(|| Self::Material {
+                unlit: true,
+                alpha_mode: if renderable_data.premultiplied_alpha {
+                    AlphaMode::Premultiplied
+                } else {
+                    AlphaMode::Blend
+                },
+                ..Self::Material::default()
+            });
+            material.base_color_texture = Some(renderable_data.texture);
+            Some(material)
+        } else {
+            None
+        }
     }
 }

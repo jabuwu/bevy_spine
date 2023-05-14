@@ -33,7 +33,7 @@ use textures::SpineTextureConfig;
 
 use crate::{
     assets::{AtlasLoader, SkeletonJsonLoader},
-    materials::{FRAGMENT_SHADER_HANDLE, VERTEX_SHADER_HANDLE},
+    materials::{SpineMaterialPlugin, FRAGMENT_SHADER_HANDLE, VERTEX_SHADER_HANDLE},
     rusty_spine::{
         controller::SkeletonControllerSettings, draw::CullDirection, AnimationStateData,
         BoneHandle, EventType,
@@ -81,9 +81,6 @@ pub enum SpineSet {
     /// [`SpineSystem::UpdateMeshes`], so that systems can handle events immediately after the
     /// skeleton updates but before it renders.
     OnEvent,
-    /// A helper Set occuring after [`SpineSystem::UpdateMeshes`] to allow adjusting custom
-    /// materials on [`SpineMesh`] entities.
-    OnUpdateMaterials,
 }
 
 /// Add Spine support to Bevy!
@@ -111,6 +108,14 @@ impl Plugin for SpinePlugin {
             .add_plugin(Material2dPlugin::<SpineAdditivePmaMaterial>::default())
             .add_plugin(Material2dPlugin::<SpineMultiplyPmaMaterial>::default())
             .add_plugin(Material2dPlugin::<SpineScreenPmaMaterial>::default())
+            .add_plugin(SpineMaterialPlugin::<SpineNormalMaterial>::default())
+            .add_plugin(SpineMaterialPlugin::<SpineAdditiveMaterial>::default())
+            .add_plugin(SpineMaterialPlugin::<SpineMultiplyMaterial>::default())
+            .add_plugin(SpineMaterialPlugin::<SpineScreenMaterial>::default())
+            .add_plugin(SpineMaterialPlugin::<SpineNormalPmaMaterial>::default())
+            .add_plugin(SpineMaterialPlugin::<SpineAdditivePmaMaterial>::default())
+            .add_plugin(SpineMaterialPlugin::<SpineMultiplyPmaMaterial>::default())
+            .add_plugin(SpineMaterialPlugin::<SpineScreenPmaMaterial>::default())
             .add_plugin(SpineSyncPlugin::first())
             .init_resource::<SpineEventQueue>()
             .insert_resource(SpineTextures::init())
@@ -149,12 +154,6 @@ impl Plugin for SpinePlugin {
                     .in_set(SpineSystem::UpdateMeshes)
                     .after(SpineSystem::UpdateAnimation)
                     .after(SpineSet::OnEvent),
-            )
-            .add_system(
-                spine_update_materials
-                    .in_set(SpineSystem::UpdateMaterials)
-                    .in_set(SpineSet::OnUpdateMaterials)
-                    .after(SpineSystem::UpdateMeshes),
             )
             .add_system(
                 apply_system_buffers
@@ -220,10 +219,15 @@ pub enum SpineMeshState {
     #[default]
     Empty,
     Renderable {
-        texture: Handle<Image>,
-        blend_mode: BlendMode,
-        premultiplied_alpha: bool,
+        data: SpineRenderableData,
     },
+}
+
+#[derive(Clone)]
+pub struct SpineRenderableData {
+    pub texture: Handle<Image>,
+    pub blend_mode: BlendMode,
+    pub premultiplied_alpha: bool,
 }
 
 impl core::ops::Deref for Spine {
@@ -838,9 +842,11 @@ fn spine_update_meshes(
                         take(&mut renderable.dark_colors),
                     );
                     spine_mesh.state = SpineMeshState::Renderable {
-                        texture: asset_server.load(texture_path.as_str()),
-                        blend_mode: renderable.blend_mode,
-                        premultiplied_alpha: renderable.premultiplied_alpha,
+                        data: SpineRenderableData {
+                            texture: asset_server.load(texture_path.as_str()),
+                            blend_mode: renderable.blend_mode,
+                            premultiplied_alpha: renderable.premultiplied_alpha,
+                        },
                     };
                     empty = false;
                 }
@@ -849,143 +855,6 @@ fn spine_update_meshes(
                     empty_mesh(mesh);
                 }
                 renderable_index += 1;
-            }
-        }
-    }
-}
-
-#[allow(clippy::type_complexity, clippy::too_many_arguments)]
-fn spine_update_materials(
-    mut commands: Commands,
-    mut spine_query: Query<(&Children, Option<&SpineSettings>), With<Spine>>,
-    mut normal_materials: ResMut<Assets<SpineNormalMaterial>>,
-    mut additive_materials: ResMut<Assets<SpineAdditiveMaterial>>,
-    mut multiply_materials: ResMut<Assets<SpineMultiplyMaterial>>,
-    mut screen_materials: ResMut<Assets<SpineScreenMaterial>>,
-    mut normal_pma_materials: ResMut<Assets<SpineNormalPmaMaterial>>,
-    mut additive_pma_materials: ResMut<Assets<SpineAdditivePmaMaterial>>,
-    mut multiply_pma_materials: ResMut<Assets<SpineMultiplyPmaMaterial>>,
-    mut screen_pma_materials: ResMut<Assets<SpineScreenPmaMaterial>>,
-    mesh_query: Query<(
-        Entity,
-        &SpineMesh,
-        Option<&Handle<SpineNormalMaterial>>,
-        Option<&Handle<SpineAdditiveMaterial>>,
-        Option<&Handle<SpineMultiplyMaterial>>,
-        Option<&Handle<SpineScreenMaterial>>,
-        Option<&Handle<SpineNormalPmaMaterial>>,
-        Option<&Handle<SpineAdditivePmaMaterial>>,
-        Option<&Handle<SpineMultiplyPmaMaterial>>,
-        Option<&Handle<SpineScreenPmaMaterial>>,
-    )>,
-) {
-    for (spine_children, spine_default_materials) in spine_query.iter_mut() {
-        let enable_default_materials = spine_default_materials
-            .cloned()
-            .unwrap_or(SpineSettings::default())
-            .default_materials;
-        for child in spine_children.iter() {
-            if let Ok((
-                mesh_entity,
-                spine_mesh,
-                normal_material_handle,
-                additive_material_handle,
-                multiply_material_handle,
-                screen_material_handle,
-                normal_pma_material_handle,
-                additive_pma_material_handle,
-                multiply_pma_material_handle,
-                screen_pma_material_handle,
-            )) = mesh_query.get(*child)
-            {
-                let SpineMeshState::Renderable { texture, blend_mode, premultiplied_alpha, .. } = spine_mesh.state.clone() else {
-                    continue;
-                };
-
-                macro_rules! apply_material {
-                    ($condition:expr, $material:ty, $handle:ident, $assets:ident) => {
-                        // Is this is the material we want to attach?
-                        if enable_default_materials && $condition {
-                            let handle = if let Some(handle) = $handle {
-                                // It's already attached
-                                handle.clone()
-                            } else {
-                                // Create the material and attach it
-                                let handle = $assets.add(<$material>::new(texture.clone()));
-                                #[cfg(feature = "workaround_5732")]
-                                {
-                                    workaround_5732::store(handle.clone_untyped());
-                                }
-                                if let Some(mut entity_commands) = commands.get_entity(mesh_entity)
-                                {
-                                    entity_commands.insert(handle.clone());
-                                }
-                                handle
-                            };
-                            // Set the material's image
-                            if let Some(material) = $assets.get_mut(&handle) {
-                                material.image = texture.clone();
-                            }
-                        } else {
-                            // Detach the material if it exists
-                            if $handle.is_some() {
-                                if let Some(mut entity_commands) = commands.get_entity(mesh_entity)
-                                {
-                                    entity_commands.remove::<Handle<$material>>();
-                                }
-                            }
-                        }
-                    };
-                }
-
-                apply_material!(
-                    blend_mode == BlendMode::Normal && !premultiplied_alpha,
-                    SpineNormalMaterial,
-                    normal_material_handle,
-                    normal_materials
-                );
-                apply_material!(
-                    blend_mode == BlendMode::Additive && !premultiplied_alpha,
-                    SpineAdditiveMaterial,
-                    additive_material_handle,
-                    additive_materials
-                );
-                apply_material!(
-                    blend_mode == BlendMode::Multiply && !premultiplied_alpha,
-                    SpineMultiplyMaterial,
-                    multiply_material_handle,
-                    multiply_materials
-                );
-                apply_material!(
-                    blend_mode == BlendMode::Screen && !premultiplied_alpha,
-                    SpineScreenMaterial,
-                    screen_material_handle,
-                    screen_materials
-                );
-                apply_material!(
-                    blend_mode == BlendMode::Normal && premultiplied_alpha,
-                    SpineNormalPmaMaterial,
-                    normal_pma_material_handle,
-                    normal_pma_materials
-                );
-                apply_material!(
-                    blend_mode == BlendMode::Additive && premultiplied_alpha,
-                    SpineAdditivePmaMaterial,
-                    additive_pma_material_handle,
-                    additive_pma_materials
-                );
-                apply_material!(
-                    blend_mode == BlendMode::Multiply && premultiplied_alpha,
-                    SpineMultiplyPmaMaterial,
-                    multiply_pma_material_handle,
-                    multiply_pma_materials
-                );
-                apply_material!(
-                    blend_mode == BlendMode::Screen && premultiplied_alpha,
-                    SpineScreenPmaMaterial,
-                    screen_pma_material_handle,
-                    screen_pma_materials
-                );
             }
         }
     }
