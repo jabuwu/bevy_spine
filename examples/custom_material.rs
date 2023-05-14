@@ -11,8 +11,8 @@ use bevy::{
     sprite::{Material2d, Material2dKey, Material2dPlugin},
 };
 use bevy_spine::{
-    SkeletonController, SkeletonData, Spine, SpineBundle, SpineDefaultMaterials, SpineMesh,
-    SpineMeshState, SpinePlugin, SpineReadyEvent, SpineSet,
+    SkeletonController, SkeletonData, Spine, SpineBundle, SpineMesh, SpineMeshState, SpinePlugin,
+    SpineReadyEvent, SpineSet, SpineSettings,
 };
 
 fn main() {
@@ -51,7 +51,10 @@ fn setup(
         SpineBundle {
             skeleton: skeleton_handle.clone(),
             transform: Transform::from_xyz(230., -130., 0.).with_scale(Vec3::ONE * 0.375),
-            default_materials: SpineDefaultMaterials::Disabled,
+            settings: SpineSettings {
+                default_materials: false,
+                ..Default::default()
+            },
             ..Default::default()
         },
         MySpine,

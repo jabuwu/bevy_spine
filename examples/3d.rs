@@ -74,7 +74,11 @@ fn setup(
     commands.spawn(SpineBundle {
         skeleton: skeleton_handle.clone(),
         transform: Transform::from_xyz(0., 0., 0.).with_scale(Vec3::ONE * 0.005),
-        mesh_type: SpineMeshType::Mesh3d,
+        settings: SpineSettings {
+            default_materials: false,
+            use_3d_mesh: true,
+            ..Default::default()
+        },
         ..Default::default()
     });
 }

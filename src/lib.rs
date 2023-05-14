@@ -299,48 +299,24 @@ impl SpineLoader {
     }
 }
 
-/// A flag component indicating if the default Spine materials should be used.
-///
-/// If set to [`SpineDefaultMaterials::Disabled`], no materials will be attached by default and must
-/// be set manually to each [`SpineMesh`] entity.
-///
-/// Defaults to [`SpineDefaultMaterials::Enabled`].
-#[derive(Default, Component, Clone, Copy, PartialEq, Eq)]
-pub enum SpineDefaultMaterials {
-    #[default]
-    Enabled,
-    Disabled,
+#[derive(Component, Clone, Copy, PartialEq, Eq)]
+pub struct SpineSettings {
+    /// Indicates if default Spine materials should be used (default: `true`).
+    ///
+    /// If `false`, no materials will be attached by default and must be set manually to each
+    /// [`SpineMesh`] entity.
+    pub default_materials: bool,
+    /// Indicates if the meshes should be drawn in 3D (default: `false`).
+    pub use_3d_mesh: bool,
 }
 
-impl SpineDefaultMaterials {
-    pub fn enable(&mut self) {
-        *self = SpineDefaultMaterials::Enabled;
-    }
-
-    pub fn disable(&mut self) {
-        *self = SpineDefaultMaterials::Disabled;
-    }
-
-    pub fn set_enabled(&mut self, enabled: bool) {
-        *self = match enabled {
-            true => SpineDefaultMaterials::Enabled,
-            false => SpineDefaultMaterials::Disabled,
+impl Default for SpineSettings {
+    fn default() -> Self {
+        Self {
+            default_materials: true,
+            use_3d_mesh: false,
         }
     }
-
-    pub fn is_enabled(&self) -> bool {
-        *self == SpineDefaultMaterials::Enabled
-    }
-}
-
-/// Indicates if the meshes should be drawn in 2D or 3D.
-///
-/// Defaults to [`SpineMeshType::Mesh2d`].
-#[derive(Default, Component, Clone, Copy, PartialEq, Eq)]
-pub enum SpineMeshType {
-    #[default]
-    Mesh2d,
-    Mesh3d,
 }
 
 /// Bundle for Spine skeletons with all the necessary components.
@@ -406,8 +382,7 @@ pub enum SpineMeshType {
 #[derive(Default, Bundle)]
 pub struct SpineBundle {
     pub loader: SpineLoader,
-    pub default_materials: SpineDefaultMaterials,
-    pub mesh_type: SpineMeshType,
+    pub settings: SpineSettings,
     pub skeleton: Handle<SkeletonData>,
     pub crossfades: Crossfades,
     pub transform: Transform,
@@ -781,7 +756,7 @@ fn spine_update_animation(
 }
 
 fn spine_update_meshes(
-    mut spine_query: Query<(&mut Spine, &Children, Option<&SpineMeshType>)>,
+    mut spine_query: Query<(&mut Spine, &Children, Option<&SpineSettings>)>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut mesh_query: Query<(
         Entity,
@@ -793,8 +768,10 @@ fn spine_update_meshes(
     asset_server: Res<AssetServer>,
 ) {
     for (mut spine, spine_children, spine_mesh_type) in spine_query.iter_mut() {
-        let mesh_is_3d =
-            spine_mesh_type.cloned().unwrap_or(SpineMeshType::Mesh2d) == SpineMeshType::Mesh3d;
+        let mesh_is_3d = spine_mesh_type
+            .cloned()
+            .unwrap_or(SpineSettings::default())
+            .use_3d_mesh;
         let mut renderables = spine.0.combined_renderables();
         let mut renderable_index = 0;
         for child in spine_children.iter() {
@@ -880,7 +857,7 @@ fn spine_update_meshes(
 #[allow(clippy::type_complexity, clippy::too_many_arguments)]
 fn spine_update_materials(
     mut commands: Commands,
-    mut spine_query: Query<(&Children, Option<&SpineDefaultMaterials>), With<Spine>>,
+    mut spine_query: Query<(&Children, Option<&SpineSettings>), With<Spine>>,
     mut normal_materials: ResMut<Assets<SpineNormalMaterial>>,
     mut additive_materials: ResMut<Assets<SpineAdditiveMaterial>>,
     mut multiply_materials: ResMut<Assets<SpineMultiplyMaterial>>,
@@ -905,8 +882,8 @@ fn spine_update_materials(
     for (spine_children, spine_default_materials) in spine_query.iter_mut() {
         let enable_default_materials = spine_default_materials
             .cloned()
-            .unwrap_or(SpineDefaultMaterials::Disabled)
-            == SpineDefaultMaterials::Enabled;
+            .unwrap_or(SpineSettings::default())
+            .default_materials;
         for child in spine_children.iter() {
             if let Ok((
                 mesh_entity,
@@ -1143,10 +1120,9 @@ mod workaround_5732;
 #[doc(hidden)]
 pub mod prelude {
     pub use crate::{
-        Crossfades, SkeletonController, SkeletonData, Spine, SpineBone, SpineBundle,
-        SpineDefaultMaterials, SpineEvent, SpineLoader, SpineMesh, SpineMeshState, SpineMeshType,
-        SpinePlugin, SpineReadyEvent, SpineSet, SpineSync, SpineSyncSet, SpineSyncSystem,
-        SpineSystem,
+        Crossfades, SkeletonController, SkeletonData, Spine, SpineBone, SpineBundle, SpineEvent,
+        SpineLoader, SpineMesh, SpineMeshState, SpinePlugin, SpineReadyEvent, SpineSet,
+        SpineSettings, SpineSync, SpineSyncSet, SpineSyncSystem, SpineSystem,
     };
     pub use rusty_spine::{BoneHandle, SlotHandle};
 }
