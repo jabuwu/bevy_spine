@@ -3,6 +3,9 @@
 - Support Spine texture runtime settings
 - Add `SpineSet::OnEvent`
 - Fix some events getting missed
+- Revamped material support
+  - Custom material support (see `custom_material` example)
+  - Added support for 3D meshes and materials (see `3d` example)
 
 # 0.5.0
 - Update to Bevy 0.10
