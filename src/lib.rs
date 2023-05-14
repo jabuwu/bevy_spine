@@ -21,13 +21,13 @@ use bevy::{
     sprite::{Material2dPlugin, Mesh2dHandle},
 };
 use materials::{
-    SpineAdditiveMaterial, SpineAdditivePmaMaterial, SpineMultiplyMaterial,
+    SpineAdditiveMaterial, SpineAdditivePmaMaterial, SpineMaterialInfo, SpineMultiplyMaterial,
     SpineMultiplyPmaMaterial, SpineNormalMaterial, SpineNormalPmaMaterial, SpineScreenMaterial,
     SpineScreenPmaMaterial,
 };
 use rusty_spine::{
     atlas::{AtlasFilter, AtlasWrap},
-    BlendMode, Skeleton,
+    Skeleton,
 };
 use textures::SpineTextureConfig;
 
@@ -214,20 +214,14 @@ pub struct SpineMesh {
     pub state: SpineMeshState,
 }
 
+/// The state of this [`SpineMesh`].
 #[derive(Default, Component, Clone)]
 pub enum SpineMeshState {
+    /// This Spine mesh contains no mesh data and should not render.
     #[default]
     Empty,
-    Renderable {
-        data: SpineRenderableData,
-    },
-}
-
-#[derive(Clone)]
-pub struct SpineRenderableData {
-    pub texture: Handle<Image>,
-    pub blend_mode: BlendMode,
-    pub premultiplied_alpha: bool,
+    /// This Spine mesh contains mesh data and should render.
+    Renderable { info: SpineMaterialInfo },
 }
 
 impl core::ops::Deref for Spine {
@@ -303,14 +297,18 @@ impl SpineLoader {
     }
 }
 
+/// Settings for how this Spine updates and renders.
 #[derive(Component, Clone, Copy, PartialEq, Eq)]
 pub struct SpineSettings {
     /// Indicates if default Spine materials should be used (default: `true`).
     ///
-    /// If `false`, no materials will be attached by default and must be set manually to each
-    /// [`SpineMesh`] entity.
+    /// If `false`, a custom [`SpineMaterial`](`materials::SpineMaterial`) should be configured for
+    /// this Spine.
     pub default_materials: bool,
     /// Indicates if the meshes should be drawn in 3D (default: `false`).
+    ///
+    /// Requires a custom [`SpineMaterial`](`materials::SpineMaterial`) since the default materials
+    /// do not support 3D meshes.
     pub use_3d_mesh: bool,
 }
 
@@ -410,7 +408,7 @@ pub struct SpineReadyEvent {
 
 /// A Spine event fired from a playing animation.
 ///
-/// Sent in [`SpineSystem::Update`].
+/// Sent in [`SpineSystem::UpdateAnimation`].
 ///
 /// ```
 /// # use bevy::prelude::*;
@@ -842,7 +840,7 @@ fn spine_update_meshes(
                         take(&mut renderable.dark_colors),
                     );
                     spine_mesh.state = SpineMeshState::Renderable {
-                        data: SpineRenderableData {
+                        info: SpineMaterialInfo {
                             texture: asset_server.load(texture_path.as_str()),
                             blend_mode: renderable.blend_mode,
                             premultiplied_alpha: renderable.premultiplied_alpha,

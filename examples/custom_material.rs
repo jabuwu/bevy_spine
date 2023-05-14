@@ -12,9 +12,9 @@ use bevy::{
     sprite::{Material2d, Material2dKey, Material2dPlugin},
 };
 use bevy_spine::{
-    materials::{SpineMaterial, SpineMaterialPlugin},
-    SkeletonController, SkeletonData, Spine, SpineBundle, SpinePlugin, SpineReadyEvent,
-    SpineRenderableData, SpineSet, SpineSettings,
+    materials::{SpineMaterial, SpineMaterialInfo, SpineMaterialPlugin},
+    SkeletonController, SkeletonData, Spine, SpineBundle, SpinePlugin, SpineReadyEvent, SpineSet,
+    SpineSettings,
 };
 
 fn main() {
@@ -129,7 +129,7 @@ impl SpineMaterial for MyMaterial {
     fn update<'w, 's>(
         material: Option<Self>,
         entity: Entity,
-        renderable_data: SpineRenderableData,
+        renderable_data: SpineMaterialInfo,
         params: &StaticSystemParam<Self::Params<'w, 's>>,
     ) -> Option<Self> {
         if params.my_spine_query.contains(entity) {

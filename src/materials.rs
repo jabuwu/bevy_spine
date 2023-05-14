@@ -1,4 +1,6 @@
-//! Materials for Spine blend modes.
+//! Materials for Spine meshes.
+//!
+//! To create a custom material for Spine, see [`SpineMaterial`].
 
 use std::marker::PhantomData;
 
@@ -19,20 +21,32 @@ use bevy::{
 };
 use rusty_spine::BlendMode;
 
-use crate::{Spine, SpineMesh, SpineMeshState, SpineRenderableData, SpineSettings, SpineSystem};
+use crate::{Spine, SpineMesh, SpineMeshState, SpineSettings, SpineSystem};
 
+/// Trait for automatically applying materials to [`SpineMesh`] entities. Used by the built-in
+/// materials but can also be used to create custom materials.
+///
+/// Implement the trait and add it with [`SpineMaterialPlugin`].
 pub trait SpineMaterial: Sized {
+    /// The material type to apply to [`SpineMesh`]. Usually is `Self`.
     type Material: Asset;
+    /// System parameters to query when updating this material.
     type Params<'w, 's>: SystemParam;
 
+    /// Ran every frame for every material and every [`SpineMesh`].
+    ///
+    /// If this function returns [`Some`], then the material will be applied to the [`SpineMesh`],
+    /// otherwise it will be removed. Default materials should be removed if a custom material is
+    /// desired (see [`SpineSettings::default_materials`]).
     fn update<'w, 's>(
         material: Option<Self::Material>,
         entity: Entity,
-        renderable_data: SpineRenderableData,
+        renderable_data: SpineMaterialInfo,
         params: &StaticSystemParam<Self::Params<'w, 's>>,
     ) -> Option<Self::Material>;
 }
 
+/// Add support for a new [`SpineMaterial`].
 pub struct SpineMaterialPlugin<T: SpineMaterial> {
     _marker: PhantomData<T>,
 }
@@ -55,6 +69,14 @@ impl<T: SpineMaterial + Send + Sync + 'static> Plugin for SpineMaterialPlugin<T>
     }
 }
 
+/// Info necessary for a Spine material.
+#[derive(Clone)]
+pub struct SpineMaterialInfo {
+    pub texture: Handle<Image>,
+    pub blend_mode: BlendMode,
+    pub premultiplied_alpha: bool,
+}
+
 #[allow(clippy::type_complexity, clippy::too_many_arguments)]
 fn update_materials<'w, 's, T: SpineMaterial>(
     mut commands: Commands,
@@ -66,7 +88,7 @@ fn update_materials<'w, 's, T: SpineMaterial>(
     for (spine_entity, spine_children) in spine_query.iter() {
         for spine_child in spine_children.iter() {
             if let Ok((mesh_entity, spine_mesh, material_handle)) = mesh_query.get(*spine_child) {
-                let SpineMeshState::Renderable { data } = spine_mesh.state.clone() else {
+                let SpineMeshState::Renderable { info: data } = spine_mesh.state.clone() else {
                     continue;
                 };
                 if let Some(handle) = material_handle {
@@ -93,6 +115,9 @@ pub const VERTEX_SHADER_HANDLE: HandleUntyped =
 pub const FRAGMENT_SHADER_HANDLE: HandleUntyped =
     HandleUntyped::weak_from_u64(Shader::TYPE_UUID, 10048211129967055809);
 
+/// A [`SystemParam`] to query [`SpineSettings`].
+///
+/// Mostly used for the built-in materials but may be useful for implementing other materials.
 #[derive(SystemParam)]
 pub struct SpineSettingsQuery<'w, 's> {
     pub spine_settings_query: Query<'w, 's, &'static SpineSettings>,
@@ -153,7 +178,7 @@ macro_rules! material {
             fn update<'w, 's>(
                 material: Option<Self>,
                 entity: Entity,
-                renderable_data: SpineRenderableData,
+                renderable_data: SpineMaterialInfo,
                 params: &StaticSystemParam<Self::Params<'w, 's>>,
             ) -> Option<Self> {
                 let spine_settings = params.spine_settings_query.get(entity).copied().unwrap_or(SpineSettings::default());

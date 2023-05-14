@@ -5,9 +5,8 @@ use bevy::{
     window::{CursorGrabMode, PrimaryWindow},
 };
 use bevy_spine::{
-    materials::{SpineMaterial, SpineMaterialPlugin, SpineSettingsQuery},
+    materials::{SpineMaterial, SpineMaterialInfo, SpineMaterialPlugin, SpineSettingsQuery},
     prelude::*,
-    SpineRenderableData,
 };
 
 #[derive(Component)]
@@ -144,7 +143,7 @@ impl SpineMaterial for Spine3DMaterial {
     fn update<'w, 's>(
         material: Option<Self::Material>,
         entity: Entity,
-        renderable_data: SpineRenderableData,
+        renderable_data: SpineMaterialInfo,
         params: &StaticSystemParam<Self::Params<'w, 's>>,
     ) -> Option<Self::Material> {
         let spine_settings = params
