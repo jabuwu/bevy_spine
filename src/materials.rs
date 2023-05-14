@@ -100,6 +100,10 @@ fn update_materials<'w, 's, T: SpineMaterial>(
                 } else {
                     if let Some(material) = T::update(None, spine_entity, data, &params) {
                         let handle = materials.add(material);
+                        #[cfg(feature = "workaround_5732")]
+                        {
+                            crate::workaround_5732::store(handle.clone_untyped());
+                        }
                         if let Some(mut entity_commands) = commands.get_entity(mesh_entity) {
                             entity_commands.insert(handle.clone());
                         }
