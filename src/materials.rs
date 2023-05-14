@@ -58,12 +58,12 @@ impl<T: SpineMaterial + Send + Sync + 'static> Plugin for SpineMaterialPlugin<T>
 #[allow(clippy::type_complexity, clippy::too_many_arguments)]
 fn update_materials<'w, 's, T: SpineMaterial>(
     mut commands: Commands,
-    mut spine_query: Query<(Entity, &Children), With<Spine>>,
     mut materials: ResMut<Assets<T::Material>>,
+    spine_query: Query<(Entity, &Children), With<Spine>>,
     mesh_query: Query<(Entity, &SpineMesh, Option<&Handle<T::Material>>)>,
     params: StaticSystemParam<T::Params<'w, 's>>,
 ) {
-    for (spine_entity, spine_children) in spine_query.iter_mut() {
+    for (spine_entity, spine_children) in spine_query.iter() {
         for spine_child in spine_children.iter() {
             if let Ok((mesh_entity, spine_mesh, material_handle)) = mesh_query.get(*spine_child) {
                 let SpineMeshState::Renderable { data } = spine_mesh.state.clone() else {
