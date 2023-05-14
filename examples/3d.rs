@@ -1,15 +1,33 @@
-use bevy::prelude::*;
-use bevy_fly_camera::{FlyCamera, FlyCameraPlugin};
+use bevy::{
+    input::mouse::MouseMotion,
+    prelude::*,
+    window::{CursorGrabMode, PrimaryWindow},
+};
 use bevy_spine::prelude::*;
+
+#[derive(Component)]
+pub struct Orbit {
+    angle: f32,
+    pitch: f32,
+}
+
+impl Default for Orbit {
+    fn default() -> Self {
+        Self {
+            angle: 90.0_f32.to_radians(),
+            pitch: 25.0_f32.to_radians(),
+        }
+    }
+}
 
 fn main() {
     App::new()
         .add_plugins(DefaultPlugins)
         .add_plugin(SpinePlugin)
-        .add_plugin(FlyCameraPlugin)
         .add_startup_system(setup)
         .add_system(on_spawn.in_set(SpineSet::OnReady))
         .add_system(update_materials.in_set(SpineSet::OnUpdateMaterials))
+        .add_system(controls)
         .run();
 }
 
@@ -44,7 +62,7 @@ fn setup(
             transform: Transform::from_xyz(-2.0, 2.5, 5.0).looking_at(Vec3::ZERO, Vec3::Y),
             ..default()
         },
-        FlyCamera::default(),
+        Orbit::default(),
     ));
 
     // spine
@@ -106,5 +124,37 @@ fn update_materials(
                 }
             }
         }
+    }
+}
+
+fn controls(
+    mut window_query: Query<&mut Window, With<PrimaryWindow>>,
+    mut mouse_motion_events: EventReader<MouseMotion>,
+    mut orbit_query: Query<(&mut Orbit, &mut Transform)>,
+    mouse_buttons: Res<Input<MouseButton>>,
+    keys: Res<Input<KeyCode>>,
+) {
+    let mut window = window_query.single_mut();
+    if mouse_buttons.just_pressed(MouseButton::Left) {
+        window.cursor.grab_mode = CursorGrabMode::Locked;
+        window.cursor.visible = false;
+    }
+    if keys.just_pressed(KeyCode::Escape) {
+        window.cursor.grab_mode = CursorGrabMode::None;
+        window.cursor.visible = true;
+    }
+
+    let mut mouse_movement = Vec2::ZERO;
+    for mouse_motion_event in mouse_motion_events.iter() {
+        if window.cursor.grab_mode == CursorGrabMode::Locked {
+            mouse_movement += mouse_motion_event.delta;
+        }
+    }
+    for (mut orbit, mut orbit_transform) in orbit_query.iter_mut() {
+        orbit.angle = (orbit.angle + mouse_movement.x * 0.001).clamp(0.14159, 3.);
+        orbit.pitch = (orbit.pitch + mouse_movement.y * 0.001).clamp(0.1, 1.5);
+        orbit_transform.translation =
+            Vec3::new(orbit.angle.cos(), orbit.pitch.tan(), orbit.angle.sin()).normalize() * 7.;
+        orbit_transform.look_at(Vec3::new(0., 1.5, 0.), Vec3::Y);
     }
 }
