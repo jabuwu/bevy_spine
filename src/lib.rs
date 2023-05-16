@@ -27,6 +27,7 @@ use materials::{
 };
 use rusty_spine::{
     atlas::{AtlasFilter, AtlasWrap},
+    controller::{SkeletonCombinedRenderable, SkeletonRenderable},
     Skeleton,
 };
 use textures::SpineTextureConfig;
@@ -208,8 +209,13 @@ pub struct SpineBone {
 }
 
 /// Marker component for child entities containing [`Mesh`] components for Spine rendering.
-#[derive(Default, Component, Clone)]
+///
+/// By default, the meshes may contain several meshes all combined into one to reduce draw calls
+/// and improve performance. To interact with individual Spine meshes, see
+/// [`SpineSettings::combined_drawer`].
+#[derive(Component, Clone)]
 pub struct SpineMesh {
+    pub spine_entity: Entity,
     pub handle: Handle<Mesh>,
     pub state: SpineMeshState,
 }
@@ -298,6 +304,8 @@ impl SpineLoader {
 }
 
 /// Settings for how this Spine updates and renders.
+///
+/// Typically set in [`SpineBundle`] when spawning an entity.
 #[derive(Component, Clone, Copy, PartialEq, Eq)]
 pub struct SpineSettings {
     /// Indicates if default Spine materials should be used (default: `true`).
@@ -310,6 +318,12 @@ pub struct SpineSettings {
     /// Requires a custom [`SpineMaterial`](`materials::SpineMaterial`) since the default materials
     /// do not support 3D meshes.
     pub use_3d_mesh: bool,
+    /// Indiciates if meshes should be combined, typically resulting in fewer draw calls and better
+    /// overall performance (default: `true`).
+    ///
+    /// Setting this to `false` may be desirable to manipulate spine meshes individually (via
+    /// [`SpineMesh`]).
+    pub combined_drawer: bool,
 }
 
 impl Default for SpineSettings {
@@ -317,6 +331,7 @@ impl Default for SpineSettings {
         Self {
             default_materials: true,
             use_3d_mesh: false,
+            combined_drawer: true,
         }
     }
 }
@@ -563,7 +578,7 @@ fn spine_spawn(
     mut skeleton_data_assets: ResMut<Assets<SkeletonData>>,
     spine_event_queue: Res<SpineEventQueue>,
 ) {
-    for (mut spine_loader, entity, data_handle, crossfades) in skeleton_query.iter_mut() {
+    for (mut spine_loader, spine_entity, data_handle, crossfades) in skeleton_query.iter_mut() {
         if let SpineLoader::Loading { with_children } = spine_loader.as_ref() {
             let skeleton_data_asset =
                 if let Some(skeleton_data_asset) = skeleton_data_assets.get_mut(data_handle) {
@@ -593,40 +608,42 @@ fn spine_spawn(
                                 EventType::Start => {
                                     let mut events = events.lock().unwrap();
                                     events.push_back(SpineEvent::Start {
-                                        entity,
+                                        entity: spine_entity,
                                         animation: track_entry.animation().name().to_owned(),
                                     });
                                 }
                                 EventType::Interrupt => {
                                     let mut events = events.lock().unwrap();
                                     events.push_back(SpineEvent::Interrupt {
-                                        entity,
+                                        entity: spine_entity,
                                         animation: track_entry.animation().name().to_owned(),
                                     });
                                 }
                                 EventType::End => {
                                     let mut events = events.lock().unwrap();
                                     events.push_back(SpineEvent::End {
-                                        entity,
+                                        entity: spine_entity,
                                         animation: track_entry.animation().name().to_owned(),
                                     });
                                 }
                                 EventType::Complete => {
                                     let mut events = events.lock().unwrap();
                                     events.push_back(SpineEvent::Complete {
-                                        entity,
+                                        entity: spine_entity,
                                         animation: track_entry.animation().name().to_owned(),
                                     });
                                 }
                                 EventType::Dispose => {
                                     let mut events = events.lock().unwrap();
-                                    events.push_back(SpineEvent::Dispose { entity });
+                                    events.push_back(SpineEvent::Dispose {
+                                        entity: spine_entity,
+                                    });
                                 }
                                 EventType::Event => {
                                     if let Some(spine_event) = spine_event {
                                         let mut events = events.lock().unwrap();
                                         events.push_back(SpineEvent::Event {
-                                            entity,
+                                            entity: spine_entity,
                                             name: spine_event.data().name().to_owned(),
                                             int: spine_event.int_value(),
                                             float: spine_event.float_value(),
@@ -643,13 +660,12 @@ fn spine_spawn(
                     );
                     controller.skeleton.set_to_setup_pose();
                     let mut bones = HashMap::new();
-                    if let Some(mut entity_commands) = commands.get_entity(entity) {
+                    if let Some(mut entity_commands) = commands.get_entity(spine_entity) {
                         entity_commands
                             .with_children(|parent| {
-                                // TODO: currently, a mesh is created for each slot, however since we use the
+                                // TODO: currently, a mesh is created for each slot, however since we may use the
                                 // combined drawer, this many meshes is usually not necessary. instead, we
                                 // may want to dynamically create meshes as needed in the render system
-                                let mut z = 0.;
                                 for _ in controller.skeleton.slots() {
                                     let mut mesh = Mesh::new(PrimitiveTopology::TriangleList);
                                     empty_mesh(&mut mesh);
@@ -660,19 +676,19 @@ fn spine_spawn(
                                     }
                                     parent.spawn((
                                         SpineMesh {
+                                            spine_entity,
                                             handle: mesh_handle.clone(),
-                                            ..Default::default()
+                                            state: SpineMeshState::Empty,
                                         },
-                                        Transform::from_xyz(0., 0., z),
+                                        Transform::from_xyz(0., 0., 0.),
                                         GlobalTransform::default(),
                                         Visibility::default(),
                                         ComputedVisibility::default(),
                                     ));
-                                    z += 0.001;
                                 }
                                 if *with_children {
                                     spawn_bones(
-                                        entity,
+                                        spine_entity,
                                         parent,
                                         &controller.skeleton,
                                         controller.skeleton.bone_root().handle(),
@@ -683,7 +699,10 @@ fn spine_spawn(
                             .insert(Spine(controller));
                     }
                     *spine_loader = SpineLoader::Ready;
-                    ready_events.0.push(SpineReadyEvent { entity, bones });
+                    ready_events.0.push(SpineReadyEvent {
+                        entity: spine_entity,
+                        bones,
+                    });
                 }
                 SkeletonDataStatus::Loading => {}
                 SkeletonDataStatus::Failed => {
@@ -757,12 +776,18 @@ fn spine_update_animation(
     }
 }
 
+enum SkeletonRenderableKind {
+    Simple(Vec<SkeletonRenderable>),
+    Combined(Vec<SkeletonCombinedRenderable>),
+}
+
 fn spine_update_meshes(
     mut spine_query: Query<(&mut Spine, &Children, Option<&SpineSettings>)>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut mesh_query: Query<(
         Entity,
         &mut SpineMesh,
+        &mut Transform,
         Option<&Mesh2dHandle>,
         Option<&Handle<Mesh>>,
     )>,
@@ -770,15 +795,26 @@ fn spine_update_meshes(
     asset_server: Res<AssetServer>,
 ) {
     for (mut spine, spine_children, spine_mesh_type) in spine_query.iter_mut() {
-        let mesh_is_3d = spine_mesh_type
-            .cloned()
-            .unwrap_or(SpineSettings::default())
-            .use_3d_mesh;
-        let mut renderables = spine.0.combined_renderables();
+        let SpineSettings {
+            use_3d_mesh,
+            combined_drawer,
+            ..
+        } = spine_mesh_type.cloned().unwrap_or(SpineSettings::default());
+        let mut renderables = if combined_drawer {
+            SkeletonRenderableKind::Combined(spine.0.combined_renderables())
+        } else {
+            SkeletonRenderableKind::Simple(spine.0.renderables())
+        };
+        let mut z = 0.;
         let mut renderable_index = 0;
         for child in spine_children.iter() {
-            if let Ok((spine_mesh_entity, mut spine_mesh, spine_2d_mesh, spine_3d_mesh)) =
-                mesh_query.get_mut(*child)
+            if let Ok((
+                spine_mesh_entity,
+                mut spine_mesh,
+                mut spine_mesh_transform,
+                spine_2d_mesh,
+                spine_3d_mesh,
+            )) = mesh_query.get_mut(*child)
             {
                 macro_rules! apply_mesh {
                     ($mesh:ident, $condition:expr, $attach:expr, $deattach:ty) => {
@@ -799,13 +835,13 @@ fn spine_update_meshes(
                 }
                 apply_mesh!(
                     spine_2d_mesh,
-                    !mesh_is_3d,
+                    !use_3d_mesh,
                     Mesh2dHandle(spine_mesh.handle.clone()),
                     Mesh2dHandle
                 );
                 apply_mesh!(
                     spine_3d_mesh,
-                    mesh_is_3d,
+                    use_3d_mesh,
                     spine_mesh.handle.clone(),
                     Handle<Mesh>
                 );
@@ -814,38 +850,100 @@ fn spine_update_meshes(
                 };
                 let mut empty = true;
                 'render: {
-                    let Some(renderable) = renderables.get_mut(renderable_index) else {
-                        break 'render;
+                    let (
+                        slot_index,
+                        attachment_renderer_object,
+                        vertices,
+                        indices,
+                        uvs,
+                        colors,
+                        dark_colors,
+                        blend_mode,
+                        premultiplied_alpha,
+                    ) = match &mut renderables {
+                        SkeletonRenderableKind::Simple(vec) => {
+                            let Some(renderable) = vec.get_mut(renderable_index) else {
+                                break 'render;
+                            };
+                            let colors = vec![
+                                [
+                                    renderable.color.r,
+                                    renderable.color.g,
+                                    renderable.color.b,
+                                    renderable.color.a
+                                ];
+                                renderable.vertices.len()
+                            ];
+                            let dark_colors = vec![
+                                [
+                                    renderable.dark_color.r,
+                                    renderable.dark_color.g,
+                                    renderable.dark_color.b,
+                                    renderable.dark_color.a
+                                ];
+                                renderable.vertices.len()
+                            ];
+                            (
+                                Some(renderable.slot_index as usize),
+                                renderable.attachment_renderer_object,
+                                take(&mut renderable.vertices),
+                                take(&mut renderable.indices),
+                                take(&mut renderable.uvs),
+                                colors,
+                                dark_colors,
+                                renderable.blend_mode,
+                                renderable.premultiplied_alpha,
+                            )
+                        }
+                        SkeletonRenderableKind::Combined(vec) => {
+                            let Some(renderable) = vec.get_mut(renderable_index) else {
+                                break 'render;
+                            };
+                            (
+                                None,
+                                renderable.attachment_renderer_object,
+                                take(&mut renderable.vertices),
+                                take(&mut renderable.indices),
+                                take(&mut renderable.uvs),
+                                take(&mut renderable.colors),
+                                take(&mut renderable.dark_colors),
+                                renderable.blend_mode,
+                                renderable.premultiplied_alpha,
+                            )
+                        }
                     };
-                    let Some(attachment_render_object) = renderable.attachment_renderer_object else {
+                    let Some(attachment_render_object) = attachment_renderer_object else {
                         break 'render;
                     };
                     let spine_texture =
                         unsafe { &mut *(attachment_render_object as *mut SpineTexture) };
                     let texture_path = spine_texture.0.clone();
                     let mut normals = vec![];
-                    for _ in 0..renderable.vertices.len() {
+                    for _ in 0..vertices.len() {
                         normals.push([0., 0., 0.]);
                     }
-                    mesh.set_indices(Some(Indices::U16(take(&mut renderable.indices))));
+                    mesh.set_indices(Some(Indices::U16(indices)));
                     mesh.insert_attribute(
                         MeshVertexAttribute::new("Vertex_Position", 0, VertexFormat::Float32x2),
-                        take(&mut renderable.vertices),
+                        vertices,
                     );
                     mesh.insert_attribute(Mesh::ATTRIBUTE_NORMAL, normals);
-                    mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, take(&mut renderable.uvs));
-                    mesh.insert_attribute(Mesh::ATTRIBUTE_COLOR, take(&mut renderable.colors));
+                    mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, uvs);
+                    mesh.insert_attribute(Mesh::ATTRIBUTE_COLOR, colors);
                     mesh.insert_attribute(
                         MeshVertexAttribute::new("Vertex_DarkColor", 5, VertexFormat::Float32x4),
-                        take(&mut renderable.dark_colors),
+                        dark_colors,
                     );
                     spine_mesh.state = SpineMeshState::Renderable {
                         info: SpineMaterialInfo {
+                            slot_index,
                             texture: asset_server.load(texture_path.as_str()),
-                            blend_mode: renderable.blend_mode,
-                            premultiplied_alpha: renderable.premultiplied_alpha,
+                            blend_mode,
+                            premultiplied_alpha,
                         },
                     };
+                    spine_mesh_transform.translation.z = z;
+                    z += 0.001;
                     empty = false;
                 }
                 if empty {

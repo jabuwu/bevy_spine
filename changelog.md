@@ -6,6 +6,7 @@
 - Revamped material support
   - Custom material support (see `custom_material` example)
   - Added support for 3D meshes and materials (see `3d` example)
+- Spine meshes can now be drawn using the non-combined (simple) drawer
 
 # 0.5.0
 - Update to Bevy 0.10

@@ -55,6 +55,7 @@ fn setup(
             transform: Transform::from_xyz(230., -130., 0.).with_scale(Vec3::ONE * 0.375),
             settings: SpineSettings {
                 default_materials: false,
+                combined_drawer: false,
                 ..Default::default()
             },
             ..Default::default()
@@ -118,7 +119,7 @@ impl Material2d for MyMaterial {
 
 #[derive(SystemParam)]
 pub struct MyMaterialParam<'w, 's> {
-    my_spine_query: Query<'w, 's, &'static MySpine>,
+    my_spine_query: Query<'w, 's, &'static Spine, With<MySpine>>,
     time: Res<'w, Time>,
 }
 
@@ -132,10 +133,18 @@ impl SpineMaterial for MyMaterial {
         renderable_data: SpineMaterialInfo,
         params: &StaticSystemParam<Self::Params<'w, 's>>,
     ) -> Option<Self> {
-        if params.my_spine_query.contains(entity) {
+        if let Ok(spine) = params.my_spine_query.get(entity) {
             let mut material = material.unwrap_or_else(|| Self::default());
             material.image = renderable_data.texture;
             material.time = params.time.elapsed_seconds();
+            if let Some(slot) = spine
+                .skeleton
+                .slot_at_index(renderable_data.slot_index.unwrap_or(9999) as i32)
+            {
+                if slot.data().name().starts_with("portal") {
+                    material.time = 0.;
+                }
+            }
             Some(material)
         } else {
             None

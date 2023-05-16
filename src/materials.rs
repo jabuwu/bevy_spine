@@ -72,6 +72,7 @@ impl<T: SpineMaterial + Send + Sync + 'static> Plugin for SpineMaterialPlugin<T>
 /// Info necessary for a Spine material.
 #[derive(Clone)]
 pub struct SpineMaterialInfo {
+    pub slot_index: Option<usize>,
     pub texture: Handle<Image>,
     pub blend_mode: BlendMode,
     pub premultiplied_alpha: bool,
