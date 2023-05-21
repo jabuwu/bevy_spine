@@ -82,6 +82,9 @@ pub enum SpineSet {
     /// [`SpineSystem::UpdateMeshes`], so that systems can handle events immediately after the
     /// skeleton updates but before it renders.
     OnEvent,
+    /// A helper set occuring simultaneously with [`SpineSystem::UpdateMeshes`], useful for custom
+    /// mesh creation when using [`SpineDrawer::None`].
+    OnUpdateMesh,
 }
 
 /// Add Spine support to Bevy!
@@ -153,6 +156,7 @@ impl Plugin for SpinePlugin {
             .add_system(
                 spine_update_meshes
                     .in_set(SpineSystem::UpdateMeshes)
+                    .in_set(SpineSet::OnUpdateMesh)
                     .after(SpineSystem::UpdateAnimation)
                     .after(SpineSet::OnEvent),
             )
@@ -318,12 +322,24 @@ pub struct SpineSettings {
     /// Requires a custom [`SpineMaterial`](`materials::SpineMaterial`) since the default materials
     /// do not support 3D meshes.
     pub use_3d_mesh: bool,
-    /// Indiciates if meshes should be combined, typically resulting in fewer draw calls and better
-    /// overall performance (default: `true`).
+    /// The drawer this Spine should use to create its meshes.
+    pub drawer: SpineDrawer,
+}
+
+/// Drawer methods to use in [`SpineSettings`].
+#[derive(Component, Clone, Copy, PartialEq, Eq)]
+pub enum SpineDrawer {
+    /// Draw each slot as a separate mesh, each represented by one [`SpineMesh`].
     ///
-    /// Setting this to `false` may be desirable to manipulate spine meshes individually (via
-    /// [`SpineMesh`]).
-    pub combined_drawer: bool,
+    /// Useful if individual meshes need separate materials, z-depth, or other rendering
+    /// differences. Less performant, but more versatile than [`SpineDrawer::Combined`].
+    Separated,
+    /// Combine multiple slots into a single mesh.
+    ///
+    /// The default, and most performanent drawer method. Suitable for most use cases.
+    Combined,
+    /// Do not update meshes at all.
+    None,
 }
 
 impl Default for SpineSettings {
@@ -331,7 +347,7 @@ impl Default for SpineSettings {
         Self {
             default_materials: true,
             use_3d_mesh: false,
-            combined_drawer: true,
+            drawer: SpineDrawer::Combined,
         }
     }
 }
@@ -776,7 +792,7 @@ fn spine_update_animation(
     }
 }
 
-enum SkeletonRenderableKind {
+pub enum SkeletonRenderableKind {
     Simple(Vec<SkeletonRenderable>),
     Combined(Vec<SkeletonCombinedRenderable>),
 }
@@ -797,13 +813,15 @@ fn spine_update_meshes(
     for (mut spine, spine_children, spine_mesh_type) in spine_query.iter_mut() {
         let SpineSettings {
             use_3d_mesh,
-            combined_drawer,
+            drawer,
             ..
         } = spine_mesh_type.cloned().unwrap_or(SpineSettings::default());
-        let mut renderables = if combined_drawer {
-            SkeletonRenderableKind::Combined(spine.0.combined_renderables())
-        } else {
-            SkeletonRenderableKind::Simple(spine.0.renderables())
+        let mut renderables = match drawer {
+            SpineDrawer::Combined => {
+                SkeletonRenderableKind::Combined(spine.0.combined_renderables())
+            }
+            SpineDrawer::Separated => SkeletonRenderableKind::Simple(spine.0.renderables()),
+            SpineDrawer::None => continue,
         };
         let mut z = 0.;
         let mut renderable_index = 0;

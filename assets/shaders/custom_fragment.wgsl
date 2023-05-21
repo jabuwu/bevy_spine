@@ -18,11 +18,12 @@ var<uniform> time: f32;
 @fragment
 fn fragment(input: VertexOutput) -> @location(0) vec4<f32> {
     let time_sin = 0.5 + cos(time * 10.0) * 0.5;
+    let tex_sample = textureSample(texture, texture_sampler, input.uv);
     let tex_color = vec4(
-        textureSample(texture, texture_sampler, input.uv).r * time_sin + (1.0 - textureSample(texture, texture_sampler, input.uv).r) * (1.0 - time_sin * 1.0),
-        textureSample(texture, texture_sampler, input.uv).g * time_sin + (1.0 - textureSample(texture, texture_sampler, input.uv).g) * (0.5 - time_sin * 0.5),
-        textureSample(texture, texture_sampler, input.uv).b * time_sin,
-        textureSample(texture, texture_sampler, input.uv).a
+        tex_sample.r * time_sin + (1.0 - tex_sample.r) * (1.0 - time_sin * 1.0),
+        tex_sample.g * time_sin + (1.0 - tex_sample.g) * (0.5 - time_sin * 0.5),
+        tex_sample.b * time_sin,
+        tex_sample.a
     );
     return vec4(
         ((tex_color.a - 1.0) * input.dark_color.a + 1.0 - tex_color.rgb) * input.dark_color.rgb + tex_color.rgb * input.color.rgb,

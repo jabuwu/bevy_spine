@@ -13,8 +13,8 @@ use bevy::{
 };
 use bevy_spine::{
     materials::{SpineMaterial, SpineMaterialInfo, SpineMaterialPlugin},
-    SkeletonController, SkeletonData, Spine, SpineBundle, SpinePlugin, SpineReadyEvent, SpineSet,
-    SpineSettings,
+    SkeletonController, SkeletonData, Spine, SpineBundle, SpineDrawer, SpinePlugin,
+    SpineReadyEvent, SpineSet, SpineSettings,
 };
 
 fn main() {
@@ -55,7 +55,7 @@ fn setup(
             transform: Transform::from_xyz(230., -130., 0.).with_scale(Vec3::ONE * 0.375),
             settings: SpineSettings {
                 default_materials: false,
-                combined_drawer: false,
+                drawer: SpineDrawer::Separated,
                 ..Default::default()
             },
             ..Default::default()

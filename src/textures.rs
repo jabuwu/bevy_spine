@@ -8,7 +8,7 @@ use rusty_spine::atlas::{AtlasFilter, AtlasWrap};
 use crate::Atlas;
 
 #[derive(Debug)]
-pub(crate) struct SpineTexture(pub String);
+pub struct SpineTexture(pub String);
 
 #[derive(Debug)]
 struct SpineTextureInternal {
