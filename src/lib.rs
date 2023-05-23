@@ -683,8 +683,7 @@ fn spine_spawn(
                                 // combined drawer, this many meshes is usually not necessary. instead, we
                                 // may want to dynamically create meshes as needed in the render system
                                 for _ in controller.skeleton.slots() {
-                                    let mut mesh = Mesh::new(PrimitiveTopology::TriangleList);
-                                    empty_mesh(&mut mesh);
+                                    let mesh = Mesh::new(PrimitiveTopology::TriangleList);
                                     let mesh_handle = meshes.add(mesh);
                                     #[cfg(feature = "workaround_5732")]
                                     {
