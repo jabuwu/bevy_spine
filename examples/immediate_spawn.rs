@@ -10,20 +10,20 @@ pub enum ExampleSet {
 
 fn main() {
     App::new()
-        .add_plugins(DefaultPlugins)
-        .add_plugin(SpinePlugin)
+        .add_plugins((DefaultPlugins, SpinePlugin))
         .init_resource::<DemoData>()
-        .add_startup_system(setup)
-        .add_system(spawn.in_set(ExampleSet::Spawn).after(SpineSystem::Load))
-        .add_system(
-            on_spawn
-                .after(SpineSystem::Ready)
-                .before(SpineSystem::UpdateAnimation),
-        )
-        .add_system(
-            apply_system_buffers
-                .after(ExampleSet::Spawn)
-                .before(SpineSystem::Spawn),
+        .add_systems(Startup, setup)
+        .add_systems(
+            Update,
+            (
+                spawn.in_set(ExampleSet::Spawn).after(SpineSystem::Load),
+                on_spawn
+                    .after(SpineSystem::Ready)
+                    .before(SpineSystem::UpdateAnimation),
+                apply_deferred
+                    .after(ExampleSet::Spawn)
+                    .before(SpineSystem::Spawn),
+            ),
         )
         .run();
 }

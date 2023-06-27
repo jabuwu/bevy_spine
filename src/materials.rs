@@ -8,13 +8,12 @@ use bevy::{
     asset::Asset,
     ecs::system::{StaticSystemParam, SystemParam},
     prelude::*,
-    reflect::TypeUuid,
+    reflect::{TypePath, TypeUuid},
     render::{
-        mesh::MeshVertexBufferLayout,
+        mesh::{MeshVertexAttribute, MeshVertexBufferLayout},
         render_resource::{
             AsBindGroup, BlendComponent, BlendFactor, BlendOperation, BlendState,
-            RenderPipelineDescriptor, ShaderRef, SpecializedMeshPipelineError, VertexAttribute,
-            VertexFormat,
+            RenderPipelineDescriptor, ShaderRef, SpecializedMeshPipelineError, VertexFormat,
         },
     },
     sprite::{Material2d, Material2dKey},
@@ -29,7 +28,7 @@ use crate::{Spine, SpineMesh, SpineMeshState, SpineSettings, SpineSystem};
 /// Implement the trait and add it with [`SpineMaterialPlugin`].
 pub trait SpineMaterial: Sized {
     /// The material type to apply to [`SpineMesh`]. Usually is `Self`.
-    type Material: Asset;
+    type Material: Asset + Clone;
     /// System parameters to query when updating this material.
     type Params<'w, 's>: SystemParam;
 
@@ -61,7 +60,8 @@ impl<T: SpineMaterial> Default for SpineMaterialPlugin<T> {
 
 impl<T: SpineMaterial + Send + Sync + 'static> Plugin for SpineMaterialPlugin<T> {
     fn build(&self, app: &mut App) {
-        app.add_system(
+        app.add_systems(
+            Update,
             update_materials::<T>
                 .in_set(SpineSystem::UpdateMaterials)
                 .after(SpineSystem::UpdateMeshes),
@@ -92,19 +92,19 @@ fn update_materials<'w, 's, T: SpineMaterial>(
                 let SpineMeshState::Renderable { info: data } = spine_mesh.state.clone() else {
                     continue;
                 };
-                if let Some(handle) = material_handle {
-                    if let Some(material) =
-                        T::update(materials.remove(handle), spine_entity, data, &params)
+                if let Some((material, handle)) =
+                    material_handle.and_then(|handle| materials.get_mut(handle).zip(Some(handle)))
+                {
+                    if let Some(new_material) =
+                        T::update(Some(material.clone()), spine_entity, data, &params)
                     {
-                        materials.set_untracked(handle, material);
+                        *material = new_material;
+                    } else {
+                        materials.remove(handle);
                     }
                 } else {
                     if let Some(material) = T::update(None, spine_entity, data, &params) {
                         let handle = materials.add(material);
-                        #[cfg(feature = "workaround_5732")]
-                        {
-                            crate::workaround_5732::store(handle.clone_untyped());
-                        }
                         if let Some(mut entity_commands) = commands.get_entity(mesh_entity) {
                             entity_commands.insert(handle.clone());
                         }
@@ -114,6 +114,13 @@ fn update_materials<'w, 's, T: SpineMaterial>(
         }
     }
 }
+
+pub const DARK_COLOR_SHADER_POSITION: usize = 10;
+pub const DARK_COLOR_ATTRIBUTE: MeshVertexAttribute = MeshVertexAttribute::new(
+    "Vertex_DarkColor",
+    DARK_COLOR_SHADER_POSITION,
+    VertexFormat::Float32x4,
+);
 
 pub const VERTEX_SHADER_HANDLE: HandleUntyped =
     HandleUntyped::weak_from_u64(Shader::TYPE_UUID, 10655547040990968849);
@@ -131,7 +138,7 @@ pub struct SpineSettingsQuery<'w, 's> {
 macro_rules! material {
     ($(#[$($attrss:tt)*])* $uuid:literal, $name:ident, $blend_mode:expr, $premultiplied_alpha:expr, $blend_state:expr) => {
         $(#[$($attrss)*])*
-        #[derive(Default, AsBindGroup, TypeUuid, Clone)]
+        #[derive(Default, AsBindGroup, TypeUuid, TypePath, Clone)]
         #[uuid = $uuid]
         pub struct $name {
             #[texture(0)]
@@ -156,16 +163,17 @@ macro_rules! material {
 
             fn specialize(
                 descriptor: &mut RenderPipelineDescriptor,
-                _layout: &MeshVertexBufferLayout,
+                layout: &MeshVertexBufferLayout,
                 _key: Material2dKey<Self>,
             ) -> Result<(), SpecializedMeshPipelineError> {
-                descriptor.vertex.buffers[0]
-                    .attributes
-                    .push(VertexAttribute {
-                        format: VertexFormat::Float32x4,
-                        offset: 44,
-                        shader_location: 5,
-                    });
+                let mut vertex_attributes = Vec::new();
+                vertex_attributes.push(Mesh::ATTRIBUTE_POSITION.at_shader_location(0));
+                vertex_attributes.push(Mesh::ATTRIBUTE_NORMAL.at_shader_location(1));
+                vertex_attributes.push(Mesh::ATTRIBUTE_UV_0.at_shader_location(2));
+                vertex_attributes.push(Mesh::ATTRIBUTE_COLOR.at_shader_location(4));
+                vertex_attributes.push(DARK_COLOR_ATTRIBUTE.at_shader_location(DARK_COLOR_SHADER_POSITION as u32));
+                let vertex_buffer_layout = layout.get_layout(&vertex_attributes)?;
+                descriptor.vertex.buffers = vec![vertex_buffer_layout];
                 if let Some(fragment) = &mut descriptor.fragment {
                     if let Some(target_state) = &mut fragment.targets[0] {
                         target_state.blend = Some($blend_state);

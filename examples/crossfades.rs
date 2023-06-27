@@ -6,14 +6,16 @@ use bevy_spine::{
 
 fn main() {
     App::new()
-        .add_plugins(DefaultPlugins)
-        .add_plugin(SpinePlugin)
-        .add_startup_system(setup)
-        .add_system(on_spawn.in_set(SpineSet::OnReady))
-        .add_system(
-            crossfades
-                .after(SpineSystem::UpdateAnimation)
-                .before(SpineSystem::UpdateMeshes),
+        .add_plugins((DefaultPlugins, SpinePlugin))
+        .add_systems(Startup, setup)
+        .add_systems(
+            Update,
+            (
+                on_spawn.in_set(SpineSet::OnReady),
+                crossfades
+                    .after(SpineSystem::UpdateAnimation)
+                    .before(SpineSystem::UpdateMeshes),
+            ),
         )
         .run();
 }

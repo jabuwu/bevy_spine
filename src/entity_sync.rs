@@ -16,7 +16,6 @@ pub enum SpineSynchronizerSystem<T: SpineSynchronizer> {
     SyncBones,
     /// Set for [`spine_sync_entities_applied`]
     SyncEntitiesApplied,
-    #[system_set(ignore_fields)]
     _Data(PhantomData<T>),
 }
 
@@ -32,7 +31,6 @@ pub enum SpineSynchronizerSet<T: SpineSynchronizer> {
     /// Occurs after synchronizing [`SpineBone`] entity transforms back to the Spine skeleton.
     /// Useful for any final adjustments, bypassing Spine's constraints.
     AfterSync,
-    #[system_set(ignore_fields)]
     _Data(PhantomData<T>),
 }
 
@@ -115,25 +113,24 @@ impl<T: SpineSynchronizer> SpineSynchronizerPlugin<T, SpineSystem> {
 
 impl<T: SpineSynchronizer, A: SystemSet + Copy> Plugin for SpineSynchronizerPlugin<T, A> {
     fn build(&self, app: &mut App) {
-        app.add_system(
-            spine_sync_entities::<T>
-                .in_set(SpineSynchronizerSystem::<T>::SyncEntities)
-                .after(self.after)
-                .after(SpineSynchronizerSet::<T>::BeforeSync)
-                .before(SpineSynchronizerSet::<T>::DuringSync),
-        )
-        .add_system(
-            spine_sync_bones::<T>
-                .in_set(SpineSynchronizerSystem::<T>::SyncBones)
-                .after(SpineSynchronizerSystem::<T>::SyncEntities)
-                .after(SpineSynchronizerSet::<T>::DuringSync),
-        )
-        .add_system(
-            spine_sync_entities_applied::<T>
-                .in_set(SpineSynchronizerSystem::<T>::SyncEntitiesApplied)
-                .after(SpineSynchronizerSystem::<T>::SyncBones)
-                .before(SpineSynchronizerSet::<T>::AfterSync)
-                .before(SpineSystem::UpdateMeshes),
+        app.add_systems(
+            Update,
+            (
+                spine_sync_entities::<T>
+                    .in_set(SpineSynchronizerSystem::<T>::SyncEntities)
+                    .after(self.after)
+                    .after(SpineSynchronizerSet::<T>::BeforeSync)
+                    .before(SpineSynchronizerSet::<T>::DuringSync),
+                spine_sync_bones::<T>
+                    .in_set(SpineSynchronizerSystem::<T>::SyncBones)
+                    .after(SpineSynchronizerSystem::<T>::SyncEntities)
+                    .after(SpineSynchronizerSet::<T>::DuringSync),
+                spine_sync_entities_applied::<T>
+                    .in_set(SpineSynchronizerSystem::<T>::SyncEntitiesApplied)
+                    .after(SpineSynchronizerSystem::<T>::SyncBones)
+                    .before(SpineSynchronizerSet::<T>::AfterSync)
+                    .before(SpineSystem::UpdateMeshes),
+            ),
         );
     }
 }

@@ -4,7 +4,7 @@ struct VertexOutput {
     @location(1) world_normal: vec3<f32>,
     @location(2) uv: vec2<f32>,
     @location(4) color: vec4<f32>,
-    @location(5) dark_color: vec4<f32>,
+    @location(10) dark_color: vec4<f32>,
 };
 
 @group(1) @binding(0)

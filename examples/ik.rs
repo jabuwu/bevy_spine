@@ -6,13 +6,15 @@ use bevy_spine::{
 
 fn main() {
     App::new()
-        .add_plugins(DefaultPlugins)
-        .add_plugin(SpinePlugin)
-        .add_startup_system(setup)
-        .add_system(on_spawn.in_set(SpineSet::OnReady))
-        .add_system(
-            ik.after(SpineSystem::UpdateAnimation)
-                .before(SpineSystem::UpdateMeshes),
+        .add_plugins((DefaultPlugins, SpinePlugin))
+        .add_systems(Startup, setup)
+        .add_systems(
+            Update,
+            (
+                on_spawn.in_set(SpineSet::OnReady),
+                ik.after(SpineSystem::UpdateAnimation)
+                    .before(SpineSystem::UpdateMeshes),
+            ),
         )
         .run();
 }
@@ -76,8 +78,9 @@ fn ik(mut spine_query: Query<&mut Spine>, window_query: Query<&Window>) {
         } else {
             continue;
         };
-        let cursor_adjustment =
+        let mut cursor_adjustment =
             cursor_position - Vec2::new(window.width() * 0.5, window.height() * 0.5);
+        cursor_adjustment *= Vec2::new(1., -1.);
         let cursor = bone
             .parent()
             .unwrap()
