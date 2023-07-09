@@ -12,11 +12,11 @@ exclude = [
 ]
 
 [dependencies]
-rusty_spine = { git = "https://github.com/jabuwu/rusty_spine", rev = "70af6880ad86fff246e71ca33401f3ba3351efd6" }
-bevy = { git = "https://github.com/bevyengine/bevy", rev = "10f5c9206847ae01b8dc833c2680562e7bd46664", default-features = false, features = [ "bevy_render", "bevy_asset", "bevy_sprite" ] }
+rusty_spine = "0.6"
+bevy = { version = "0.11", default-features = false, features = [ "bevy_render", "bevy_asset", "bevy_sprite" ] }
 glam = { version = "0.24", features = [ "mint" ] }
 anyhow = "1.0"
 
 [dev-dependencies]
 lerp = "0.4"
-bevy = { git = "https://github.com/bevyengine/bevy", rev = "10f5c9206847ae01b8dc833c2680562e7bd46664", default-features = true }
+bevy = { version = "0.11", default-features = true }
