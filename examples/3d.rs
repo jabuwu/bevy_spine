@@ -26,12 +26,13 @@ impl Default for Orbit {
 
 fn main() {
     App::new()
-        .add_plugins(DefaultPlugins)
-        .add_plugin(SpinePlugin)
-        .add_plugin(SpineMaterialPlugin::<Spine3DMaterial>::default())
-        .add_startup_system(setup)
-        .add_system(on_spawn.in_set(SpineSet::OnReady))
-        .add_system(controls)
+        .add_plugins((
+            DefaultPlugins,
+            SpinePlugin,
+            SpineMaterialPlugin::<Spine3DMaterial>::default(),
+        ))
+        .add_systems(Startup, setup)
+        .add_systems(Update, (on_spawn.in_set(SpineSet::OnReady), controls))
         .run();
 }
 

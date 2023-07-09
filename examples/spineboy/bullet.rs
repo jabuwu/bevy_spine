@@ -10,16 +10,19 @@ pub struct BulletPlugin;
 
 impl Plugin for BulletPlugin {
     fn build(&self, app: &mut App) {
-        app.add_event::<BulletSpawnEvent>()
-            .add_system(bullet_spawn.in_set(BulletSystem::Spawn))
-            .add_system(
+        app.add_event::<BulletSpawnEvent>().add_systems(
+            Update,
+            (
+                bullet_spawn.in_set(BulletSystem::Spawn),
                 bullet_update
                     .in_set(BulletSystem::Update)
                     .after(BulletSystem::Spawn),
-            );
+            ),
+        );
     }
 }
 
+#[derive(Event)]
 pub struct BulletSpawnEvent {
     pub position: Vec2,
     pub velocity: Vec2,

@@ -1,30 +1,34 @@
 use bevy::{
     ecs::system::{StaticSystemParam, SystemParam},
     prelude::*,
-    reflect::TypeUuid,
+    reflect::{TypePath, TypeUuid},
     render::{
         mesh::MeshVertexBufferLayout,
         render_resource::{
             AsBindGroup, RenderPipelineDescriptor, ShaderRef, SpecializedMeshPipelineError,
-            VertexAttribute, VertexFormat,
         },
     },
     sprite::{Material2d, Material2dKey, Material2dPlugin},
 };
 use bevy_spine::{
-    materials::{SpineMaterial, SpineMaterialInfo, SpineMaterialPlugin},
+    materials::{
+        SpineMaterial, SpineMaterialInfo, SpineMaterialPlugin, DARK_COLOR_ATTRIBUTE,
+        DARK_COLOR_SHADER_POSITION,
+    },
     SkeletonController, SkeletonData, Spine, SpineBundle, SpineDrawer, SpinePlugin,
     SpineReadyEvent, SpineSet, SpineSettings,
 };
 
 fn main() {
     App::new()
-        .add_plugins(DefaultPlugins)
-        .add_plugin(SpinePlugin)
-        .add_plugin(Material2dPlugin::<MyMaterial>::default())
-        .add_plugin(SpineMaterialPlugin::<MyMaterial>::default())
-        .add_startup_system(setup)
-        .add_system(on_spawn.in_set(SpineSet::OnReady))
+        .add_plugins((
+            DefaultPlugins,
+            SpinePlugin,
+            Material2dPlugin::<MyMaterial>::default(),
+            SpineMaterialPlugin::<MyMaterial>::default(),
+        ))
+        .add_systems(Startup, setup)
+        .add_systems(Update, on_spawn.in_set(SpineSet::OnReady))
         .run();
 }
 
@@ -81,7 +85,7 @@ fn on_spawn(
 #[derive(Component)]
 pub struct MySpine;
 
-#[derive(AsBindGroup, TypeUuid, Clone, Default)]
+#[derive(AsBindGroup, TypeUuid, TypePath, Clone, Default)]
 #[uuid = "2e85f9ae-049a-4bb5-9f5d-ebaaa208df60"]
 pub struct MyMaterial {
     #[texture(0)]
@@ -102,16 +106,18 @@ impl Material2d for MyMaterial {
 
     fn specialize(
         descriptor: &mut RenderPipelineDescriptor,
-        _layout: &MeshVertexBufferLayout,
+        layout: &MeshVertexBufferLayout,
         _key: Material2dKey<Self>,
     ) -> Result<(), SpecializedMeshPipelineError> {
-        descriptor.vertex.buffers[0]
-            .attributes
-            .push(VertexAttribute {
-                format: VertexFormat::Float32x4,
-                offset: 44,
-                shader_location: 5,
-            });
+        let mut vertex_attributes = Vec::new();
+        vertex_attributes.push(Mesh::ATTRIBUTE_POSITION.at_shader_location(0));
+        vertex_attributes.push(Mesh::ATTRIBUTE_NORMAL.at_shader_location(1));
+        vertex_attributes.push(Mesh::ATTRIBUTE_UV_0.at_shader_location(2));
+        vertex_attributes.push(Mesh::ATTRIBUTE_COLOR.at_shader_location(4));
+        vertex_attributes
+            .push(DARK_COLOR_ATTRIBUTE.at_shader_location(DARK_COLOR_SHADER_POSITION as u32));
+        let vertex_buffer_layout = layout.get_layout(&vertex_attributes)?;
+        descriptor.vertex.buffers = vec![vertex_buffer_layout];
         descriptor.primitive.cull_mode = None;
         Ok(())
     }
@@ -139,7 +145,7 @@ impl SpineMaterial for MyMaterial {
             material.time = params.time.elapsed_seconds();
             if let Some(slot) = spine
                 .skeleton
-                .slot_at_index(renderable_data.slot_index.unwrap_or(9999) as i32)
+                .slot_at_index(renderable_data.slot_index.unwrap_or(9999))
             {
                 if slot.data().name().starts_with("portal") {
                     material.time = 0.;

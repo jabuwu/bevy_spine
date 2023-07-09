@@ -34,7 +34,7 @@ pub(crate) struct SpineTextures {
 /// An [`Event`] fired for each texture loaded by Spine.
 ///
 /// Sent in [`SpineSystem::Load`](`crate::SpineSystem::Load`).
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Event)]
 pub struct SpineTextureCreateEvent {
     pub path: String,
     pub handle: Handle<Image>,
@@ -45,7 +45,7 @@ pub struct SpineTextureCreateEvent {
 /// An [`Event`] fired for each texture disposed, after [`SpineTextureCreateEvent`].
 ///
 /// Sent in [`SpineSystem::Load`](`crate::SpineSystem::Load`).
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Event)]
 pub struct SpineTextureDisposeEvent {
     pub path: String,
     pub handle: Handle<Image>,
@@ -128,7 +128,7 @@ impl SpineTextures {
 fn find_matching_atlas(atlases: &Assets<Atlas>, atlas_address: usize) -> Option<Handle<Atlas>> {
     for (atlas_handle, atlas) in atlases.iter() {
         if atlas.atlas.c_ptr() as usize == atlas_address {
-            return Some(atlases.get_handle(atlas_handle));
+            return Some(Handle::weak(atlas_handle));
         }
     }
     None

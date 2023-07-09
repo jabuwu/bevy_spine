@@ -12,13 +12,11 @@ exclude = [
 ]
 
 [dependencies]
-rusty_spine = "0.5.2"
-bevy = { version = "0.10", default-features = false, features = [ "bevy_render", "bevy_asset", "bevy_sprite" ] }
-bevy_math = { version = "0.10", features = [ "mint" ] }
+rusty_spine = "0.6"
+bevy = { version = "0.11", default-features = false, features = [ "bevy_render", "bevy_asset", "bevy_sprite" ] }
+glam = { version = "0.24", features = [ "mint" ] }
+anyhow = "1.0"
 
 [dev-dependencies]
 lerp = "0.4"
-bevy = { version = "0.10", default-features = true }
-
-[features]
-workaround_5732 = [] # enable to workaround Bevy issue #5732
+bevy = { version = "0.11", default-features = true }

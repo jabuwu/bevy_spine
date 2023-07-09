@@ -4,12 +4,12 @@ use lerp::Lerp;
 
 use crate::bullet::{BulletSpawnEvent, BulletSystem};
 
-const PLAYER_TRACK_PORTAL: i32 = 0;
-const PLAYER_TRACK_IDLE: i32 = 0;
-const PLAYER_TRACK_RUN: i32 = 1;
-const PLAYER_TRACK_JUMP: i32 = 2;
-const PLAYER_TRACK_AIM: i32 = 3;
-const PLAYER_TRACK_SHOOT: i32 = 4;
+const PLAYER_TRACK_PORTAL: usize = 0;
+const PLAYER_TRACK_IDLE: usize = 0;
+const PLAYER_TRACK_RUN: usize = 1;
+const PLAYER_TRACK_JUMP: usize = 2;
+const PLAYER_TRACK_AIM: usize = 3;
+const PLAYER_TRACK_SHOOT: usize = 4;
 
 #[derive(Debug, Hash, PartialEq, Eq, Clone, SystemSet)]
 pub enum PlayerSystem {
@@ -26,38 +26,33 @@ pub struct PlayerPlugin;
 
 impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
-        app.add_event::<PlayerSpawnEvent>()
-            .add_system(player_spawn.in_set(PlayerSystem::Spawn))
-            .add_system(player_spine_ready.in_set(PlayerSystem::SpineReady))
-            .add_system(
+        app.add_event::<PlayerSpawnEvent>().add_systems(
+            Update,
+            (
+                player_spawn.in_set(PlayerSystem::Spawn),
+                player_spine_ready.in_set(PlayerSystem::SpineReady),
                 player_spine_events
                     .in_set(PlayerSystem::SpineEvents)
                     .in_set(SpineSyncSet::BeforeSync),
-            )
-            .add_system(
                 player_aim
                     .in_set(PlayerSystem::Aim)
                     .in_set(SpineSyncSet::DuringSync),
-            )
-            .add_system(
                 player_shoot
                     .in_set(PlayerSystem::Shoot)
                     .in_set(SpineSyncSet::AfterSync)
                     .before(BulletSystem::Spawn),
-            )
-            .add_system(
                 player_move
                     .in_set(PlayerSystem::Move)
                     .in_set(SpineSyncSet::BeforeSync),
-            )
-            .add_system(
                 player_jump
                     .in_set(PlayerSystem::Jump)
                     .in_set(SpineSyncSet::BeforeSync),
-            );
+            ),
+        );
     }
 }
 
+#[derive(Event)]
 pub struct PlayerSpawnEvent {
     pub skeleton: Handle<SkeletonData>,
 }
@@ -156,12 +151,12 @@ fn player_spine_events(
                         run_track.set_shortest_rotation(true);
                         controller
                             .animation_state
-                            .track_at_index_mut(PLAYER_TRACK_AIM as usize)
+                            .track_at_index_mut(PLAYER_TRACK_AIM)
                             .unwrap()
                             .set_alpha(0.);
                         controller
                             .animation_state
-                            .track_at_index_mut(PLAYER_TRACK_RUN as usize)
+                            .track_at_index_mut(PLAYER_TRACK_RUN)
                             .unwrap()
                             .set_alpha(0.);
                         player.spawned = true;
@@ -196,7 +191,7 @@ fn player_aim(
                 let ndc_to_world =
                     camera_transform.compute_matrix() * camera.projection_matrix().inverse();
                 let world_pos = ndc_to_world.project_point3(ndc.extend(-1.0));
-                world_pos.truncate()
+                world_pos.truncate() * Vec2::new(1., -1.)
             } else {
                 Vec2::ZERO
             }
@@ -227,9 +222,8 @@ fn player_aim(
                 if let Ok(mut player_transform) = transform_query.get_mut(player_entity) {
                     player_transform.scale.x = (scale_x * player_transform.scale.x).signum() * 0.25;
                 }
-                if let Some(mut aim_track) = spine
-                    .animation_state
-                    .track_at_index_mut(PLAYER_TRACK_AIM as usize)
+                if let Some(mut aim_track) =
+                    spine.animation_state.track_at_index_mut(PLAYER_TRACK_AIM)
                 {
                     let alpha = aim_track.alpha() * 2.5;
                     aim_track.set_alpha(alpha.lerp(1., time.delta_seconds()).clamp(0., 1.));
@@ -298,7 +292,7 @@ fn player_move(
             player_transform.translation.x = player_transform.translation.x.clamp(-500., 500.);
             if let Some(mut track) = player_spine
                 .animation_state
-                .track_at_index_mut(PLAYER_TRACK_RUN as usize)
+                .track_at_index_mut(PLAYER_TRACK_RUN)
             {
                 track.set_alpha(player.movement_velocity.abs());
             }
@@ -314,8 +308,7 @@ fn player_jump(mut player_query: Query<(&mut Spine, &Player)>, keys: Res<Input<K
         let Spine(SkeletonController {
             animation_state, ..
         }) = spine.as_mut();
-        if let Some(mut jump_track) = animation_state.track_at_index_mut(PLAYER_TRACK_JUMP as usize)
-        {
+        if let Some(mut jump_track) = animation_state.track_at_index_mut(PLAYER_TRACK_JUMP) {
             let progress = (jump_track.track_time()
                 / unsafe { (*jump_track.animation().c_ptr()).duration })
             .clamp(0., 1.);
@@ -332,7 +325,7 @@ fn player_jump(mut player_query: Query<(&mut Spine, &Player)>, keys: Res<Input<K
         } else if keys.just_pressed(KeyCode::Space) {
             let _ = animation_state.set_animation_by_name(PLAYER_TRACK_JUMP, "jump", false);
             animation_state
-                .track_at_index_mut(PLAYER_TRACK_JUMP as usize)
+                .track_at_index_mut(PLAYER_TRACK_JUMP)
                 .unwrap()
                 .set_alpha(0.);
         }

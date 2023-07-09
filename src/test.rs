@@ -13,7 +13,7 @@ use crate::{prelude::*, SpineSet};
 
 pub fn test_app() -> App {
     let mut app = App::new();
-    app.add_plugins(
+    app.add_plugins((
         DefaultPlugins
             .set(RenderPlugin {
                 wgpu_settings: WgpuSettings {
@@ -23,14 +23,15 @@ pub fn test_app() -> App {
             })
             .build()
             .disable::<WinitPlugin>(),
-    )
-    .add_plugin(SpinePlugin);
+        SpinePlugin,
+    ));
     app
 }
 
 pub fn test_app_with_spineboy() -> App {
     let mut app = test_app();
-    app.add_startup_system(
+    app.add_systems(
+        Startup,
         |mut commands: Commands,
          mut skeletons: ResMut<Assets<SkeletonData>>,
          asset_server: Res<AssetServer>| {
@@ -48,7 +49,8 @@ pub fn test_app_with_spineboy() -> App {
     );
     let ready = Arc::new(AtomicBool::new(false));
     let ready_inside = ready.clone();
-    app.add_system(
+    app.add_systems(
+        Update,
         (move |mut spine_ready_events: EventReader<SpineReadyEvent>| {
             for _ in spine_ready_events.iter() {
                 ready_inside.store(true, Ordering::SeqCst);
@@ -65,7 +67,7 @@ pub fn test_app_with_spineboy() -> App {
 #[test]
 fn spawn() {
     let mut app = test_app_with_spineboy();
-    app.add_system(|spine_query: Query<&Spine>| {
+    app.add_systems(Update, |spine_query: Query<&Spine>| {
         assert_eq!(spine_query.single().skeleton.data().hash(), "itfFESDjM1c");
     });
     app.update();
