@@ -1,4 +1,4 @@
-//! A Bevy 0.10 plugin for Spine 4.1
+//! A Bevy 0.11 plugin for Spine 4.1
 //!
 //! Add [`SpinePlugin`] to your Bevy app and spawn a [`SpineBundle`] to get started!
 
@@ -58,7 +58,7 @@ pub enum SpineSystem {
     /// Spawns helper entities associated with a [`SpineBundle`] for drawing meshes and
     /// (optionally) adding bone entities (see [`SpineLoader`]).
     Spawn,
-    /// An [`apply_system_buffers`] to load the spine helper entities this frame.
+    /// An [`apply_deferred`] to load the spine helper entities this frame.
     SpawnFlush,
     /// Sends [`SpineReadyEvent`] after [`SpineSystem::SpawnFlush`], indicating [`Spine`] components
     /// on newly spawned [`SpineBundle`]s can now be interacted with.
@@ -221,7 +221,7 @@ pub struct SpineBone {
 ///
 /// By default, the meshes may contain several meshes all combined into one to reduce draw calls
 /// and improve performance. To interact with individual Spine meshes, see
-/// [`SpineSettings::combined_drawer`].
+/// [`SpineSettings::drawer`].
 #[derive(Component, Clone)]
 pub struct SpineMesh {
     pub spine_entity: Entity,
