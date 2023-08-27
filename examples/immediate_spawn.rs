@@ -1,7 +1,9 @@
 //! Demonstrates how to spawn a [`SpineBundle`] and use it in one frame.
 
 use bevy::{app::AppExit, core::FrameCount, prelude::*};
-use bevy_spine::{SkeletonData, Spine, SpineBundle, SpinePlugin, SpineReadyEvent, SpineSystem};
+use bevy_spine::{
+    SkeletonData, Spine, SpineBundle, SpinePlugin, SpineReadyEvent, SpineSet, SpineSystem,
+};
 
 #[derive(Debug, Hash, PartialEq, Eq, Clone, SystemSet)]
 pub enum ExampleSet {
@@ -17,9 +19,7 @@ fn main() {
             Update,
             (
                 spawn.in_set(ExampleSet::Spawn).after(SpineSystem::Load),
-                on_spawn
-                    .after(SpineSystem::Ready)
-                    .before(SpineSystem::UpdateAnimation),
+                on_spawn.in_set(SpineSet::OnReady),
                 apply_deferred
                     .after(ExampleSet::Spawn)
                     .before(SpineSystem::Spawn),

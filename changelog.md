@@ -1,3 +1,6 @@
+# 0.7.0
+- Add `parent` to `SpineBone`
+
 # 0.6.0
 - Update to Bevy 0.11
 - Improve premultiplied alpha support by pre-processing premultiplied textures

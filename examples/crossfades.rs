@@ -12,9 +12,7 @@ fn main() {
             Update,
             (
                 on_spawn.in_set(SpineSet::OnReady),
-                crossfades
-                    .after(SpineSystem::UpdateAnimation)
-                    .before(SpineSystem::UpdateMeshes),
+                crossfades.before(SpineSystem::UpdateAnimation),
             ),
         )
         .run();

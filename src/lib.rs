@@ -215,6 +215,12 @@ pub struct SpineBone {
     pub spine_entity: Entity,
     pub handle: BoneHandle,
     pub name: String,
+    pub parent: Option<SpineBoneParent>,
+}
+
+pub struct SpineBoneParent {
+    pub entity: Entity,
+    pub handle: BoneHandle,
 }
 
 /// Marker component for child entities containing [`Mesh`] components for Spine rendering.
@@ -717,6 +723,7 @@ fn spine_spawn(
                                 if *with_children {
                                     spawn_bones(
                                         spine_entity,
+                                        None,
                                         parent,
                                         &controller.skeleton,
                                         controller.skeleton.bone_root().handle(),
@@ -743,6 +750,7 @@ fn spine_spawn(
 
 fn spawn_bones(
     spine_entity: Entity,
+    bone_parent: Option<SpineBoneParent>,
     parent: &mut ChildBuilder,
     skeleton: &Skeleton,
     bone: BoneHandle,
@@ -767,10 +775,21 @@ fn spawn_bones(
                 spine_entity,
                 handle: bone.handle(),
                 name: bone.data().name().to_owned(),
+                parent: bone_parent,
             })
             .with_children(|parent| {
                 for child in bone.children() {
-                    spawn_bones(spine_entity, parent, skeleton, child.handle(), bones);
+                    spawn_bones(
+                        spine_entity,
+                        Some(SpineBoneParent {
+                            entity: parent.parent_entity(),
+                            handle: bone.handle(),
+                        }),
+                        parent,
+                        skeleton,
+                        child.handle(),
+                        bones,
+                    );
                 }
             })
             .id();

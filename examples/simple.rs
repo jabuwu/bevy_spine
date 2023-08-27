@@ -26,7 +26,7 @@ fn setup(
 
     commands.spawn(SpineBundle {
         skeleton: skeleton_handle.clone(),
-        transform: Transform::from_xyz(0., -200., 0.).with_scale(Vec3::ONE * 0.5),
+        transform: Transform::from_xyz(0., -200., 0.),
         ..Default::default()
     });
 }
@@ -38,8 +38,11 @@ fn on_spawn(
     for event in spine_ready_event.iter() {
         if let Ok(mut spine) = spine_query.get_mut(event.entity) {
             let Spine(SkeletonController {
-                animation_state, ..
+                skeleton,
+                animation_state,
+                ..
             }) = spine.as_mut();
+            skeleton.set_scale(Vec2::splat(0.5));
             let _ = animation_state.set_animation_by_name(0, "portal", true);
         }
     }

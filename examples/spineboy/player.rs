@@ -179,7 +179,9 @@ fn player_aim(
     camera_query: Query<(Entity, &Camera)>,
     time: Res<Time>,
 ) {
-    let Some(window) = window_query.get_single().ok() else { return };
+    let Some(window) = window_query.get_single().ok() else {
+        return;
+    };
     let cursor_position = if let Some(cursor_position) = window.cursor_position() {
         if let Ok((camera_entity, camera)) = camera_query.get_single() {
             if let Ok(camera_transform) = global_transform_query.get(camera_entity) {
@@ -309,9 +311,8 @@ fn player_jump(mut player_query: Query<(&mut Spine, &Player)>, keys: Res<Input<K
             animation_state, ..
         }) = spine.as_mut();
         if let Some(mut jump_track) = animation_state.track_at_index_mut(PLAYER_TRACK_JUMP) {
-            let progress = (jump_track.track_time()
-                / unsafe { (*jump_track.animation().c_ptr()).duration })
-            .clamp(0., 1.);
+            let progress =
+                (jump_track.track_time() / jump_track.animation().duration()).clamp(0., 1.);
             let mix_out_threshold = 0.9;
             let mix_in_threshold = 0.05;
             if progress > mix_out_threshold {
