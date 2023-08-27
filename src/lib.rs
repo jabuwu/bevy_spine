@@ -328,17 +328,24 @@ pub struct SpineSettings {
     /// If `false`, a custom [`SpineMaterial`](`materials::SpineMaterial`) should be configured for
     /// this Spine.
     pub default_materials: bool,
-    /// Indicates if the meshes should be drawn in 3D (default: `false`).
-    ///
-    /// Requires a custom [`SpineMaterial`](`materials::SpineMaterial`) since the default materials
-    /// do not support 3D meshes.
-    pub use_3d_mesh: bool,
+    /// Indicates how the meshes should be drawn.
+    pub mesh_type: SpineMeshType,
     /// The drawer this Spine should use to create its meshes.
     pub drawer: SpineDrawer,
 }
 
+/// Mesh types to use in [`SpineSettings`].
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum SpineMeshType {
+    /// Render meshes in 2D.
+    Mesh2D,
+    /// Render meshes in 3D. Requires a custom [`SpineMaterial`](`materials::SpineMaterial`) since
+    /// the default materials do not support 3D meshes.
+    Mesh3D,
+}
+
 /// Drawer methods to use in [`SpineSettings`].
-#[derive(Component, Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub enum SpineDrawer {
     /// Draw each slot as a separate mesh, each represented by one [`SpineMesh`].
     ///
@@ -357,7 +364,7 @@ impl Default for SpineSettings {
     fn default() -> Self {
         Self {
             default_materials: true,
-            use_3d_mesh: false,
+            mesh_type: SpineMeshType::Mesh2D,
             drawer: SpineDrawer::Combined,
         }
     }
@@ -843,9 +850,7 @@ fn spine_update_meshes(
 ) {
     for (mut spine, spine_children, spine_mesh_type) in spine_query.iter_mut() {
         let SpineSettings {
-            use_3d_mesh,
-            drawer,
-            ..
+            mesh_type, drawer, ..
         } = spine_mesh_type.cloned().unwrap_or(SpineSettings::default());
         let mut renderables = match drawer {
             SpineDrawer::Combined => {
@@ -884,13 +889,13 @@ fn spine_update_meshes(
                 }
                 apply_mesh!(
                     spine_2d_mesh,
-                    !use_3d_mesh,
+                    mesh_type == SpineMeshType::Mesh2D,
                     Mesh2dHandle(spine_mesh.handle.clone()),
                     Mesh2dHandle
                 );
                 apply_mesh!(
                     spine_3d_mesh,
-                    use_3d_mesh,
+                    mesh_type == SpineMeshType::Mesh3D,
                     spine_mesh.handle.clone(),
                     Handle<Mesh>
                 );

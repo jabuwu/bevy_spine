@@ -7,6 +7,7 @@ use bevy::{
 use bevy_spine::{
     materials::{SpineMaterial, SpineMaterialInfo, SpineMaterialPlugin, SpineSettingsQuery},
     prelude::*,
+    SpineMeshType,
 };
 
 #[derive(Component)]
@@ -81,7 +82,7 @@ fn setup(
         transform: Transform::from_xyz(0., 0., 0.).with_scale(Vec3::ONE * 0.005),
         settings: SpineSettings {
             default_materials: false,
-            use_3d_mesh: true,
+            mesh_type: SpineMeshType::Mesh3D,
             ..Default::default()
         },
         ..Default::default()
@@ -152,7 +153,7 @@ impl SpineMaterial for Spine3DMaterial {
             .get(entity)
             .copied()
             .unwrap_or(SpineSettings::default());
-        if spine_settings.use_3d_mesh {
+        if spine_settings.mesh_type == SpineMeshType::Mesh3D {
             let mut material = material.unwrap_or_else(|| Self::Material {
                 unlit: true,
                 alpha_mode: if renderable_data.premultiplied_alpha {

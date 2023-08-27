@@ -1,5 +1,6 @@
 # 0.7.0
 - Add `parent` to `SpineBone`
+- Rename `SpineSettings::use_3d_mesh` to `SpineSettings::mesh_type` with new `SpineMeshType` enum
 
 # 0.6.0
 - Update to Bevy 0.11
