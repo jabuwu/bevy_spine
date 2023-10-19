@@ -137,7 +137,7 @@ impl Plugin for SpinePlugin {
         .add_event::<SpineReadyEvent>()
         .add_event::<SpineEvent>()
         .add_systems(
-            Update,
+            FixedUpdate,
             (
                 spine_load.in_set(SpineSystem::Load),
                 spine_spawn
