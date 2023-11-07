@@ -30,6 +30,9 @@ use rusty_spine::{
 };
 use textures::SpineTextureConfig;
 
+#[cfg(feature = "fixed_timestep")]
+use bevy_mod_fixed::AddFixedEvent;
+
 use crate::{
     assets::{AtlasLoader, SkeletonJsonLoader},
     materials::{SpineMaterialPlugin, DARK_COLOR_ATTRIBUTE, SHADER_HANDLE},
@@ -45,6 +48,20 @@ pub use crate::{assets::*, crossfades::Crossfades, entity_sync::*, rusty_spine::
 pub use crate::rusty_spine::controller::SkeletonController;
 
 pub use rusty_spine;
+
+#[cfg(not(feature = "fixed_timestep"))]
+macro_rules! preferred_update_schedule {
+    () => {
+        Update
+    };
+}
+
+#[cfg(feature = "fixed_timestep")]
+macro_rules! preferred_update_schedule {
+    () => {
+        FixedUpdate
+    };
+}
 
 /// System sets for Spine systems.
 #[derive(Debug, Hash, PartialEq, Eq, Clone, Copy, SystemSet)]
@@ -125,8 +142,6 @@ impl Plugin for SpinePlugin {
         .init_resource::<SpineEventQueue>()
         .insert_resource(SpineTextures::init())
         .insert_resource(SpineReadyEvents::default())
-        .add_event::<SpineTextureCreateEvent>()
-        .add_event::<SpineTextureDisposeEvent>()
         .init_asset::<Atlas>()
         .init_asset::<SkeletonJson>()
         .init_asset::<SkeletonBinary>()
@@ -134,10 +149,8 @@ impl Plugin for SpinePlugin {
         .init_asset_loader::<AtlasLoader>()
         .init_asset_loader::<SkeletonJsonLoader>()
         .init_asset_loader::<SkeletonBinaryLoader>()
-        .add_event::<SpineReadyEvent>()
-        .add_event::<SpineEvent>()
         .add_systems(
-            FixedUpdate,
+            preferred_update_schedule!(),
             (
                 spine_load.in_set(SpineSystem::Load),
                 spine_spawn
@@ -166,6 +179,17 @@ impl Plugin for SpinePlugin {
             PostUpdate,
             adjust_spine_textures.in_set(SpineSystem::AdjustSpineTextures),
         );
+
+        #[cfg(not(feature = "fixed_timestep"))]
+        app.add_event::<SpineTextureCreateEvent>()
+            .add_event::<SpineTextureDisposeEvent>()
+            .add_event::<SpineReadyEvent>()
+            .add_event::<SpineEvent>();
+        #[cfg(feature = "fixed_timestep")]
+        app.add_fixed_event::<SpineTextureCreateEvent>()
+            .add_fixed_event::<SpineTextureDisposeEvent>()
+            .add_fixed_event::<SpineReadyEvent>()
+            .add_fixed_event::<SpineEvent>();
 
         load_internal_binary_asset!(
             app,

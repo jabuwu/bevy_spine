@@ -16,7 +16,11 @@ rusty_spine = "0.6"
 bevy = { version = "0.12", default-features = false, features = [ "bevy_render", "bevy_asset", "bevy_sprite" ] }
 glam = { version = "0.24", features = [ "mint" ] }
 thiserror = "1.0.50"
+bevy_mod_fixed = { git = "https://github.com/jabuwu/bevy_mod_fixed", rev = "3200ba1ef7ad444409dc4d70902bcd42cc3aa998", optional = true }
 
 [dev-dependencies]
 lerp = "0.4"
 bevy = { version = "0.12", default-features = true }
+
+[features]
+fixed_timestep = ["dep:bevy_mod_fixed"]

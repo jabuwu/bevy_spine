@@ -118,7 +118,7 @@ impl<T: SpineSynchronizer> SpineSynchronizerPlugin<T, SpineSystem> {
 impl<T: SpineSynchronizer, A: SystemSet + Copy> Plugin for SpineSynchronizerPlugin<T, A> {
     fn build(&self, app: &mut App) {
         app.add_systems(
-            FixedUpdate,
+            preferred_update_schedule!(),
             (
                 spine_sync_entities::<T>
                     .in_set(SpineSynchronizerSystem::<T>::SyncEntities)

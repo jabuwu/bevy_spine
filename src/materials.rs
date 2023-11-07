@@ -61,7 +61,7 @@ impl<T: SpineMaterial> Default for SpineMaterialPlugin<T> {
 impl<T: SpineMaterial + Send + Sync + 'static> Plugin for SpineMaterialPlugin<T> {
     fn build(&self, app: &mut App) {
         app.add_systems(
-            Update,
+            preferred_update_schedule!(),
             update_materials::<T>
                 .in_set(SpineSystem::UpdateMaterials)
                 .after(SpineSystem::UpdateMeshes),
