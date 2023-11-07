@@ -187,7 +187,7 @@ struct SpineEventQueue(Arc<Mutex<VecDeque<SpineEvent>>>);
 /// This component does not exist on [`SpineBundle`] initially, since Spine assets may not yet be
 /// loaded when an entity is spawned. Querying for this component type guarantees that all entities
 /// containing it have a Spine rig that is ready to use.
-#[derive(Component)]
+#[derive(Component, Debug)]
 pub struct Spine(pub SkeletonController);
 
 /// When loaded, a [`Spine`] entity has children entities attached to it, each containing this
@@ -197,7 +197,7 @@ pub struct Spine(pub SkeletonController);
 ///
 /// The bones are not automatically synchronized, but can be synchronized easily by adding a
 /// [`SpineSync`] component.
-#[derive(Component)]
+#[derive(Component, Debug)]
 pub struct SpineBone {
     pub spine_entity: Entity,
     pub handle: BoneHandle,
@@ -205,17 +205,21 @@ pub struct SpineBone {
     pub parent: Option<SpineBoneParent>,
 }
 
+#[derive(Debug)]
 pub struct SpineBoneParent {
     pub entity: Entity,
     pub handle: BoneHandle,
 }
+
+#[derive(Component, Clone)]
+pub struct SpineMeshes;
 
 /// Marker component for child entities containing [`Mesh`] components for Spine rendering.
 ///
 /// By default, the meshes may contain several meshes all combined into one to reduce draw calls
 /// and improve performance. To interact with individual Spine meshes, see
 /// [`SpineSettings::drawer`].
-#[derive(Component, Clone)]
+#[derive(Component, Debug, Clone)]
 pub struct SpineMesh {
     pub spine_entity: Entity,
     pub handle: Handle<Mesh>,
@@ -223,7 +227,7 @@ pub struct SpineMesh {
 }
 
 /// The state of this [`SpineMesh`].
-#[derive(Default, Component, Clone)]
+#[derive(Default, Component, Debug, Clone)]
 pub enum SpineMeshState {
     /// This Spine mesh contains no mesh data and should not render.
     #[default]
@@ -253,7 +257,7 @@ impl core::ops::DerefMut for Spine {
 /// entities representing the bones of a skeleton (see [`SpineBone`]). These bones are not
 /// synchronized (see [`SpineSync`]), and can be disabled entirely using
 /// [`SpineLoader::without_children`].
-#[derive(Component)]
+#[derive(Component, Debug)]
 pub enum SpineLoader {
     /// The spine rig is still loading.
     Loading {
@@ -308,7 +312,7 @@ impl SpineLoader {
 /// Settings for how this Spine updates and renders.
 ///
 /// Typically set in [`SpineBundle`] when spawning an entity.
-#[derive(Component, Clone, Copy, PartialEq, Eq)]
+#[derive(Component, Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SpineSettings {
     /// Indicates if default Spine materials should be used (default: `true`).
     ///
@@ -322,7 +326,7 @@ pub struct SpineSettings {
 }
 
 /// Mesh types to use in [`SpineSettings`].
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SpineMeshType {
     /// Render meshes in 2D.
     Mesh2D,
@@ -332,7 +336,7 @@ pub enum SpineMeshType {
 }
 
 /// Drawer methods to use in [`SpineSettings`].
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SpineDrawer {
     /// Draw each slot as a separate mesh, each represented by one [`SpineMesh`].
     ///
@@ -694,28 +698,42 @@ fn spine_spawn(
                     if let Some(mut entity_commands) = commands.get_entity(spine_entity) {
                         entity_commands
                             .with_children(|parent| {
-                                // TODO: currently, a mesh is created for each slot, however since we may use the
+                                // TODO: currently, a mesh is created for each slot, however when we use the
                                 // combined drawer, this many meshes is usually not necessary. instead, we
                                 // may want to dynamically create meshes as needed in the render system
-                                let mut z = 0.;
-                                for _ in controller.skeleton.slots() {
-                                    let mut mesh = Mesh::new(PrimitiveTopology::TriangleList);
-                                    empty_mesh(&mut mesh);
-                                    let mesh_handle = meshes.add(mesh);
-                                    parent.spawn((
-                                        SpineMesh {
-                                            spine_entity,
-                                            handle: mesh_handle.clone(),
-                                            state: SpineMeshState::Empty,
-                                        },
-                                        Transform::from_xyz(0., 0., z),
+                                parent
+                                    .spawn((
+                                        Name::new("spine_meshes"),
+                                        SpineMeshes,
+                                        Transform::from_xyz(0., 0., 0.),
                                         GlobalTransform::default(),
                                         Visibility::default(),
                                         InheritedVisibility::default(),
                                         ViewVisibility::default(),
-                                    ));
-                                    z += 0.001;
-                                }
+                                    ))
+                                    .with_children(|parent| {
+                                        let mut z = 0.;
+                                        for (index, _) in controller.skeleton.slots().enumerate() {
+                                            let mut mesh =
+                                                Mesh::new(PrimitiveTopology::TriangleList);
+                                            empty_mesh(&mut mesh);
+                                            let mesh_handle = meshes.add(mesh);
+                                            parent.spawn((
+                                                Name::new(format!("spine_mesh {}", index)),
+                                                SpineMesh {
+                                                    spine_entity,
+                                                    handle: mesh_handle.clone(),
+                                                    state: SpineMeshState::Empty,
+                                                },
+                                                Transform::from_xyz(0., 0., z),
+                                                GlobalTransform::default(),
+                                                Visibility::default(),
+                                                InheritedVisibility::default(),
+                                                ViewVisibility::default(),
+                                            ));
+                                            z += 0.001;
+                                        }
+                                    });
                                 if *with_children {
                                     spawn_bones(
                                         spine_entity,
@@ -762,6 +780,7 @@ fn spawn_bones(
         transform.scale.y = bone.applied_scale_y();
         let bone_entity = parent
             .spawn((
+                Name::new(format!("spine_bone ({})", bone.data().name())),
                 transform,
                 GlobalTransform::default(),
                 Visibility::default(),
@@ -826,7 +845,7 @@ pub enum SkeletonRenderableKind {
 }
 
 fn spine_update_meshes(
-    mut spine_query: Query<(&mut Spine, &Children, Option<&SpineSettings>)>,
+    mut spine_query: Query<(&mut Spine, Option<&SpineSettings>)>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut mesh_query: Query<(
         Entity,
@@ -836,9 +855,13 @@ fn spine_update_meshes(
         Option<&Handle<Mesh>>,
     )>,
     mut commands: Commands,
+    meshes_query: Query<(&Parent, &Children), With<SpineMeshes>>,
     asset_server: Res<AssetServer>,
 ) {
-    for (mut spine, spine_children, spine_mesh_type) in spine_query.iter_mut() {
+    for (meshes_parent, meshes_children) in meshes_query.iter() {
+        let Ok((mut spine, spine_mesh_type)) = spine_query.get_mut(meshes_parent.get()) else {
+            continue;
+        };
         let SpineSettings {
             mesh_type, drawer, ..
         } = spine_mesh_type.cloned().unwrap_or(SpineSettings::default());
@@ -851,7 +874,7 @@ fn spine_update_meshes(
         };
         let mut z = 0.;
         let mut renderable_index = 0;
-        for child in spine_children.iter() {
+        for child in meshes_children.iter() {
             if let Ok((
                 spine_mesh_entity,
                 mut spine_mesh,

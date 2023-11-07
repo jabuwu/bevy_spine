@@ -20,7 +20,7 @@ use bevy::{
 };
 use rusty_spine::BlendMode;
 
-use crate::{Spine, SpineMesh, SpineMeshState, SpineSettings, SpineSystem};
+use crate::{SpineMesh, SpineMeshState, SpineSettings, SpineSystem};
 
 /// Trait for automatically applying materials to [`SpineMesh`] entities. Used by the built-in
 /// materials but can also be used to create custom materials.
@@ -70,7 +70,7 @@ impl<T: SpineMaterial + Send + Sync + 'static> Plugin for SpineMaterialPlugin<T>
 }
 
 /// Info necessary for a Spine material.
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct SpineMaterialInfo {
     pub slot_index: Option<usize>,
     pub texture: Handle<Image>,
@@ -82,36 +82,34 @@ pub struct SpineMaterialInfo {
 fn update_materials<'w, 's, T: SpineMaterial>(
     mut commands: Commands,
     mut materials: ResMut<Assets<T::Material>>,
-    spine_query: Query<(Entity, &Children), With<Spine>>,
     mesh_query: Query<(Entity, &SpineMesh, Option<&Handle<T::Material>>)>,
     params: StaticSystemParam<T::Params<'w, 's>>,
 ) {
-    for (spine_entity, spine_children) in spine_query.iter() {
-        for spine_child in spine_children.iter() {
-            if let Ok((mesh_entity, spine_mesh, material_handle)) = mesh_query.get(*spine_child) {
-                let SpineMeshState::Renderable { info: data } = spine_mesh.state.clone() else {
-                    continue;
-                };
-                if let Some((material, handle)) =
-                    material_handle.and_then(|handle| materials.get_mut(handle).zip(Some(handle)))
-                {
-                    if let Some(new_material) =
-                        T::update(Some(material.clone()), spine_entity, data, &params)
-                    {
-                        *material = new_material;
-                    } else {
-                        materials.remove(handle);
-                    }
-                } else {
-                    if let Some(material) = T::update(None, spine_entity, data, &params) {
-                        let handle = materials.add(material);
-                        if let Some(mut entity_commands) = commands.get_entity(mesh_entity) {
-                            entity_commands.insert(handle.clone());
-                        }
-                    }
-                };
+    for (mesh_entity, spine_mesh, material_handle) in mesh_query.iter() {
+        let SpineMeshState::Renderable { info: data } = spine_mesh.state.clone() else {
+            continue;
+        };
+        if let Some((material, handle)) =
+            material_handle.and_then(|handle| materials.get_mut(handle).zip(Some(handle)))
+        {
+            if let Some(new_material) = T::update(
+                Some(material.clone()),
+                spine_mesh.spine_entity,
+                data,
+                &params,
+            ) {
+                *material = new_material;
+            } else {
+                materials.remove(handle);
             }
-        }
+        } else {
+            if let Some(material) = T::update(None, spine_mesh.spine_entity, data, &params) {
+                let handle = materials.add(material);
+                if let Some(mut entity_commands) = commands.get_entity(mesh_entity) {
+                    entity_commands.insert(handle.clone());
+                }
+            }
+        };
     }
 }
 

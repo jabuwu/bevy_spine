@@ -2,6 +2,9 @@
 - Update to Bevy 0.12
 - Add `parent` to `SpineBone`
 - Rename `SpineSettings::use_3d_mesh` to `SpineSettings::mesh_type` with new `SpineMeshType` enum
+- Add `Name` components to Spine mesh and bone entities
+- Add a parent `SpineMeshes` entity for all `SpineMesh` entities
+- Add `Debug` derive to components
 
 # 0.6.0
 - Update to Bevy 0.11
