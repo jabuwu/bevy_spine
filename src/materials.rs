@@ -122,10 +122,7 @@ pub const DARK_COLOR_ATTRIBUTE: MeshVertexAttribute = MeshVertexAttribute::new(
     VertexFormat::Float32x4,
 );
 
-pub const VERTEX_SHADER_HANDLE: HandleUntyped =
-    HandleUntyped::weak_from_u64(Shader::TYPE_UUID, 10655547040990968849);
-pub const FRAGMENT_SHADER_HANDLE: HandleUntyped =
-    HandleUntyped::weak_from_u64(Shader::TYPE_UUID, 10048211129967055809);
+pub const SHADER_HANDLE: Handle<Shader> = Handle::<Shader>::weak_from_u128(10655547040990968849);
 
 /// A [`SystemParam`] to query [`SpineSettings`].
 ///
@@ -138,7 +135,7 @@ pub struct SpineSettingsQuery<'w, 's> {
 macro_rules! material {
     ($(#[$($attrss:tt)*])* $uuid:literal, $name:ident, $blend_mode:expr, $premultiplied_alpha:expr, $blend_state:expr) => {
         $(#[$($attrss)*])*
-        #[derive(Default, AsBindGroup, TypeUuid, TypePath, Clone)]
+        #[derive(Asset, Default, AsBindGroup, TypeUuid, TypePath, Clone)]
         #[uuid = $uuid]
         pub struct $name {
             #[texture(0)]
@@ -154,11 +151,11 @@ macro_rules! material {
 
         impl Material2d for $name {
             fn vertex_shader() -> ShaderRef {
-                VERTEX_SHADER_HANDLE.typed().into()
+                SHADER_HANDLE.into()
             }
 
             fn fragment_shader() -> ShaderRef {
-                FRAGMENT_SHADER_HANDLE.typed().into()
+                SHADER_HANDLE.into()
             }
 
             fn specialize(

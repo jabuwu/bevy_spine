@@ -13,10 +13,8 @@ use bevy::{
     prelude::*,
     render::{
         mesh::{Indices, MeshVertexAttribute},
-        render_resource::{
-            AddressMode, FilterMode, PrimitiveTopology, SamplerDescriptor, VertexFormat,
-        },
-        texture::ImageSampler,
+        render_resource::{PrimitiveTopology, VertexFormat},
+        texture::{ImageAddressMode, ImageFilterMode, ImageSampler, ImageSamplerDescriptor},
     },
     sprite::{Material2dPlugin, Mesh2dHandle},
 };
@@ -34,9 +32,7 @@ use textures::SpineTextureConfig;
 
 use crate::{
     assets::{AtlasLoader, SkeletonJsonLoader},
-    materials::{
-        SpineMaterialPlugin, DARK_COLOR_ATTRIBUTE, FRAGMENT_SHADER_HANDLE, VERTEX_SHADER_HANDLE,
-    },
+    materials::{SpineMaterialPlugin, DARK_COLOR_ATTRIBUTE, SHADER_HANDLE},
     rusty_spine::{
         controller::SkeletonControllerSettings, draw::CullDirection, AnimationStateData, BoneHandle,
     },
@@ -96,7 +92,7 @@ pub enum SpineSet {
 /// # fn doc() {
 /// App::new()
 ///     .add_plugins(DefaultPlugins)
-///     .add_plugin(SpinePlugin)
+///     .add_plugins(SpinePlugin)
 ///     // ...
 ///     .run();
 /// # }
@@ -131,10 +127,10 @@ impl Plugin for SpinePlugin {
         .insert_resource(SpineReadyEvents::default())
         .add_event::<SpineTextureCreateEvent>()
         .add_event::<SpineTextureDisposeEvent>()
-        .add_asset::<Atlas>()
-        .add_asset::<SkeletonJson>()
-        .add_asset::<SkeletonBinary>()
-        .add_asset::<SkeletonData>()
+        .init_asset::<Atlas>()
+        .init_asset::<SkeletonJson>()
+        .init_asset::<SkeletonBinary>()
+        .init_asset::<SkeletonData>()
         .init_asset_loader::<AtlasLoader>()
         .init_asset_loader::<SkeletonJsonLoader>()
         .init_asset_loader::<SkeletonBinaryLoader>()
@@ -173,17 +169,8 @@ impl Plugin for SpinePlugin {
 
         load_internal_binary_asset!(
             app,
-            VERTEX_SHADER_HANDLE,
-            "vertex.wgsl",
-            |bytes: &[u8], path: String| Shader::from_wgsl(
-                std::str::from_utf8(bytes).unwrap().to_owned(),
-                path
-            )
-        );
-        load_internal_binary_asset!(
-            app,
-            FRAGMENT_SHADER_HANDLE,
-            "fragment.wgsl",
+            SHADER_HANDLE,
+            "spine.wgsl",
             |bytes: &[u8], path: String| Shader::from_wgsl(
                 std::str::from_utf8(bytes).unwrap().to_owned(),
                 path
@@ -444,7 +431,8 @@ pub struct SpineBundle {
     pub transform: Transform,
     pub global_transform: GlobalTransform,
     pub visibility: Visibility,
-    pub computed_visibility: ComputedVisibility,
+    pub inherited_visibility: InheritedVisibility,
+    pub view_visibility: ViewVisibility,
 }
 
 /// An [`Event`] which is sent once a [`SpineLoader`] has fully loaded a skeleton and attached the
@@ -546,7 +534,7 @@ fn spine_load(
                 premultiplied_alpha,
             } = skeleton_data_asset;
             if matches!(status, SkeletonDataStatus::Loading) {
-                let atlas = if let Some(atlas) = atlases.get(&atlas_handle) {
+                let atlas = if let Some(atlas) = atlases.get(atlas_handle.clone()) {
                     atlas
                 } else {
                     continue;
@@ -556,7 +544,7 @@ fn spine_load(
                 }
                 match kind {
                     SkeletonDataKind::JsonFile(json_handle) => {
-                        let json = if let Some(json) = jsons.get(&json_handle) {
+                        let json = if let Some(json) = jsons.get(json_handle.clone()) {
                             json
                         } else {
                             continue;
@@ -573,7 +561,7 @@ fn spine_load(
                         }
                     }
                     SkeletonDataKind::BinaryFile(binary_handle) => {
-                        let binary = if let Some(binary) = binaries.get(&binary_handle) {
+                        let binary = if let Some(binary) = binaries.get(binary_handle.clone()) {
                             binary
                         } else {
                             continue;
@@ -723,7 +711,8 @@ fn spine_spawn(
                                         Transform::from_xyz(0., 0., z),
                                         GlobalTransform::default(),
                                         Visibility::default(),
-                                        ComputedVisibility::default(),
+                                        InheritedVisibility::default(),
+                                        ViewVisibility::default(),
                                     ));
                                     z += 0.001;
                                 }
@@ -776,7 +765,8 @@ fn spawn_bones(
                 transform,
                 GlobalTransform::default(),
                 Visibility::default(),
-                ComputedVisibility::default(),
+                InheritedVisibility::default(),
+                ViewVisibility::default(),
             ))
             .insert(SpineBone {
                 spine_entity,
@@ -988,7 +978,7 @@ fn spine_update_meshes(
                     spine_mesh.state = SpineMeshState::Renderable {
                         info: SpineMaterialInfo {
                             slot_index,
-                            texture: asset_server.load(texture_path.as_str()),
+                            texture: asset_server.load(texture_path),
                             blend_mode,
                             premultiplied_alpha,
                         },
@@ -1036,7 +1026,7 @@ fn adjust_spine_textures(
     mut images: ResMut<Assets<Image>>,
 ) {
     use bevy::render::color::Color;
-    for spine_texture_create_event in spine_texture_create_events.iter() {
+    for spine_texture_create_event in spine_texture_create_events.read() {
         local.handles.push((
             spine_texture_create_event.handle.clone(),
             spine_texture_create_event.config,
@@ -1045,28 +1035,28 @@ fn adjust_spine_textures(
     let mut removed_handles = vec![];
     for (handle_index, (handle, handle_config)) in local.handles.iter().enumerate() {
         if let Some(image) = images.get_mut(&*handle) {
-            fn convert_filter(filter: AtlasFilter) -> FilterMode {
+            fn convert_filter(filter: AtlasFilter) -> ImageFilterMode {
                 match filter {
-                    AtlasFilter::Nearest => FilterMode::Nearest,
-                    AtlasFilter::Linear => FilterMode::Linear,
+                    AtlasFilter::Nearest => ImageFilterMode::Nearest,
+                    AtlasFilter::Linear => ImageFilterMode::Linear,
                     _ => {
                         warn!("Unsupported Spine filter: {:?}", filter);
-                        FilterMode::Nearest
+                        ImageFilterMode::Nearest
                     }
                 }
             }
-            fn convert_wrap(wrap: AtlasWrap) -> AddressMode {
+            fn convert_wrap(wrap: AtlasWrap) -> ImageAddressMode {
                 match wrap {
-                    AtlasWrap::ClampToEdge => AddressMode::ClampToEdge,
-                    AtlasWrap::MirroredRepeat => AddressMode::MirrorRepeat,
-                    AtlasWrap::Repeat => AddressMode::Repeat,
+                    AtlasWrap::ClampToEdge => ImageAddressMode::ClampToEdge,
+                    AtlasWrap::MirroredRepeat => ImageAddressMode::MirrorRepeat,
+                    AtlasWrap::Repeat => ImageAddressMode::Repeat,
                     _ => {
                         warn!("Unsupported Spine wrap mode: {:?}", wrap);
-                        AddressMode::ClampToEdge
+                        ImageAddressMode::ClampToEdge
                     }
                 }
             }
-            image.sampler_descriptor = ImageSampler::Descriptor(SamplerDescriptor {
+            image.sampler = ImageSampler::Descriptor(ImageSamplerDescriptor {
                 min_filter: convert_filter(handle_config.min_filter),
                 mag_filter: convert_filter(handle_config.mag_filter),
                 address_mode_u: convert_wrap(handle_config.u_wrap),

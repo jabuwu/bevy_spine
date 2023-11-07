@@ -49,7 +49,7 @@ fn on_spawn(
     mut spine_query: Query<&mut Spine>,
     mut commands: Commands,
 ) {
-    for event in spine_ready_event.iter() {
+    for event in spine_ready_event.read() {
         if let Ok(mut spine) = spine_query.get_mut(event.entity) {
             let Spine(SkeletonController {
                 skeleton,

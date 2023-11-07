@@ -52,12 +52,16 @@ pub enum SpineSynchronizerSet<T: SpineSynchronizer> {
 /// # fn doc() {
 /// fn main() {
 ///     App::new()
-///         .add_plugins(DefaultPlugins)
-///         .add_plugin(SpinePlugin)
-///         .add_plugin(MySpineSyncPlugin::default())
-///         .add_system(spawn)
-///         .add_system(during_sync.in_set(SpineSyncSet::DuringSync))
-///         .add_system(during_my_sync.in_set(MySpineSyncSet::DuringSync))
+///         .add_plugins((
+///             DefaultPlugins,
+///             SpinePlugin,
+///             MySpineSyncPlugin::default(),
+///         ))
+///         .add_systems(Update, (
+///             spawn,
+///             during_sync.in_set(SpineSyncSet::DuringSync),
+///             during_my_sync.in_set(MySpineSyncSet::DuringSync)
+///         ))
 ///         // ...
 ///         .run();
 /// }
@@ -232,12 +236,13 @@ pub type SpineSyncSystem = SpineSynchronizerSystem<SpineSync>;
 /// # fn doc() {
 /// fn main() {
 ///     App::new()
-///         .add_plugins(DefaultPlugins)
-///         .add_plugin(SpinePlugin)
-///         .add_system(spawn)
-///         .add_system(before_sync.in_set(SpineSyncSet::BeforeSync))
-///         .add_system(during_sync.in_set(SpineSyncSet::DuringSync))
-///         .add_system(after_sync.in_set(SpineSyncSet::AfterSync))
+///         .add_plugins((DefaultPlugins, SpinePlugin))
+///         .add_systems(Update, (
+///             spawn,
+///             before_sync.in_set(SpineSyncSet::BeforeSync),
+///             during_sync.in_set(SpineSyncSet::DuringSync),
+///             after_sync.in_set(SpineSyncSet::AfterSync),
+///         ))
 ///         // ...
 ///         .run();
 /// }

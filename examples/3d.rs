@@ -93,7 +93,7 @@ fn on_spawn(
     mut spine_ready_event: EventReader<SpineReadyEvent>,
     mut spine_query: Query<&mut Spine>,
 ) {
-    for event in spine_ready_event.iter() {
+    for event in spine_ready_event.read() {
         if let Ok(mut spine) = spine_query.get_mut(event.entity) {
             let Spine(SkeletonController {
                 animation_state, ..
@@ -121,7 +121,7 @@ fn controls(
     }
 
     let mut mouse_movement = Vec2::ZERO;
-    for mouse_motion_event in mouse_motion_events.iter() {
+    for mouse_motion_event in mouse_motion_events.read() {
         if window.cursor.grab_mode == CursorGrabMode::Locked {
             mouse_movement += mouse_motion_event.delta;
         }

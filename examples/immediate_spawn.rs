@@ -76,7 +76,7 @@ fn on_spawn(
     spine_query: Query<&Spine>,
     frame_count: Res<FrameCount>,
 ) {
-    for event in spine_ready_event.iter() {
+    for event in spine_ready_event.read() {
         assert!(spine_query.contains(event.entity));
         println!("ready on frame: {}", frame_count.0);
         app_exit.send_default();

@@ -16,10 +16,11 @@ pub fn test_app() -> App {
     app.add_plugins((
         DefaultPlugins
             .set(RenderPlugin {
-                wgpu_settings: WgpuSettings {
+                render_creation: WgpuSettings {
                     backends: None,
                     ..default()
-                },
+                }
+                .into(),
             })
             .build()
             .disable::<WinitPlugin>(),
@@ -52,7 +53,7 @@ pub fn test_app_with_spineboy() -> App {
     app.add_systems(
         Update,
         (move |mut spine_ready_events: EventReader<SpineReadyEvent>| {
-            for _ in spine_ready_events.iter() {
+            for _ in spine_ready_events.read() {
                 ready_inside.store(true, Ordering::SeqCst);
             }
         })

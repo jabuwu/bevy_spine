@@ -76,7 +76,7 @@ pub struct ShootController {
 }
 
 fn player_spawn(mut commands: Commands, mut player_spawn_events: EventReader<PlayerSpawnEvent>) {
-    for event in player_spawn_events.iter() {
+    for event in player_spawn_events.read() {
         commands
             .spawn(SpineBundle {
                 skeleton: event.skeleton.clone(),
@@ -97,7 +97,7 @@ fn player_spine_ready(
     mut spine_bone_query: Query<(&mut SpineBone, Entity)>,
     mut commands: Commands,
 ) {
-    for event in spine_ready_events.iter() {
+    for event in spine_ready_events.read() {
         if let Ok((mut spine, spine_entity)) = spine_query.get_mut(event.entity) {
             let Spine(SkeletonController {
                 animation_state,
@@ -128,7 +128,7 @@ fn player_spine_events(
     mut spine_events: EventReader<SpineEvent>,
     mut spine_query: Query<(&mut Spine, &mut Player)>,
 ) {
-    for event in spine_events.iter() {
+    for event in spine_events.read() {
         match event {
             SpineEvent::Complete { entity, animation } => {
                 if let Ok((mut spine, mut player)) = spine_query.get_mut(*entity) {

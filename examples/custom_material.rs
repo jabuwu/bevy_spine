@@ -72,7 +72,7 @@ fn on_spawn(
     mut spine_ready_event: EventReader<SpineReadyEvent>,
     mut spine_query: Query<&mut Spine>,
 ) {
-    for event in spine_ready_event.iter() {
+    for event in spine_ready_event.read() {
         if let Ok(mut spine) = spine_query.get_mut(event.entity) {
             let Spine(SkeletonController {
                 animation_state, ..
@@ -85,7 +85,7 @@ fn on_spawn(
 #[derive(Component)]
 pub struct MySpine;
 
-#[derive(AsBindGroup, TypeUuid, TypePath, Clone, Default)]
+#[derive(Asset, AsBindGroup, TypeUuid, TypePath, Clone, Default)]
 #[uuid = "2e85f9ae-049a-4bb5-9f5d-ebaaa208df60"]
 pub struct MyMaterial {
     #[texture(0)]
@@ -97,11 +97,11 @@ pub struct MyMaterial {
 
 impl Material2d for MyMaterial {
     fn vertex_shader() -> ShaderRef {
-        "shaders/custom_vertex.wgsl".into()
+        "shaders/custom.wgsl".into()
     }
 
     fn fragment_shader() -> ShaderRef {
-        "shaders/custom_fragment.wgsl".into()
+        "shaders/custom.wgsl".into()
     }
 
     fn specialize(

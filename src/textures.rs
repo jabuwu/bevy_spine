@@ -128,7 +128,7 @@ impl SpineTextures {
 fn find_matching_atlas(atlases: &Assets<Atlas>, atlas_address: usize) -> Option<Handle<Atlas>> {
     for (atlas_handle, atlas) in atlases.iter() {
         if atlas.atlas.c_ptr() as usize == atlas_address {
-            return Some(Handle::weak(atlas_handle));
+            return Some(Handle::Weak(atlas_handle));
         }
     }
     None

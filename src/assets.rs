@@ -1,16 +1,26 @@
 use std::{path::Path, sync::Arc};
 
 use bevy::{
-    asset::{AssetLoader, LoadContext, LoadedAsset},
+    asset::{io::Reader, AssetLoader, AsyncReadExt, LoadContext},
     prelude::*,
     reflect::{TypePath, TypeUuid},
     utils::BoxedFuture,
 };
+use rusty_spine::SpineError;
+use thiserror::Error;
+
+#[derive(Debug, Error)]
+pub enum SpineLoaderError {
+    #[error("Could load file: {0}")]
+    Io(#[from] std::io::Error),
+    #[error("Spine error: {0}")]
+    Spine(#[from] SpineError),
+}
 
 /// Bevy asset for [`rusty_spine::Atlas`], loaded from `.atlas` files.
 ///
 /// For loading a complete skeleton, see [`SkeletonData`].
-#[derive(Debug, TypeUuid, TypePath)]
+#[derive(Asset, Debug, TypeUuid, TypePath)]
 #[uuid = "e58e872a-9d35-41bf-b561-95f843686004"]
 pub struct Atlas {
     pub atlas: Arc<rusty_spine::Atlas>,
@@ -20,30 +30,28 @@ pub struct Atlas {
 pub(crate) struct AtlasLoader;
 
 impl AssetLoader for AtlasLoader {
+    type Asset = Atlas;
+    type Settings = ();
+    type Error = SpineLoaderError;
+
     fn load<'a>(
         &'a self,
-        bytes: &'a [u8],
+        reader: &'a mut Reader,
+        _settings: &'a Self::Settings,
         load_context: &'a mut LoadContext,
-    ) -> BoxedFuture<'a, Result<(), anyhow::Error>> {
+    ) -> BoxedFuture<'a, Result<Self::Asset, Self::Error>> {
         Box::pin(async move {
-            match rusty_spine::Atlas::new(
-                &bytes,
-                load_context
-                    .path()
-                    .parent()
-                    .unwrap_or_else(|| Path::new("")),
-            ) {
-                Ok(atlas) => {
-                    load_context.set_default_asset(LoadedAsset::new(Atlas {
-                        atlas: Arc::new(atlas),
-                    }));
-                    Ok(())
-                }
-                Err(_) => Err(anyhow::Error::msg(format!(
-                    "Failed to load Spine atlas: {:?}",
-                    load_context.path()
-                ))),
-            }
+            let mut bytes = Vec::new();
+            reader.read_to_end(&mut bytes).await?;
+            Ok(Atlas {
+                atlas: Arc::new(rusty_spine::Atlas::new(
+                    &bytes,
+                    load_context
+                        .path()
+                        .parent()
+                        .unwrap_or_else(|| Path::new("")),
+                )?),
+            })
         })
     }
 
@@ -55,7 +63,7 @@ impl AssetLoader for AtlasLoader {
 /// Bevy asset for [`rusty_spine::SkeletonJson`], loaded from `.json` files.
 ///
 /// For loading a complete skeleton, see [`SkeletonData`].
-#[derive(Debug, TypeUuid, TypePath)]
+#[derive(Asset, Debug, TypeUuid, TypePath)]
 #[uuid = "8637cf16-90c4-4825-bdf2-277e38788365"]
 pub struct SkeletonJson {
     pub json: Vec<u8>,
@@ -65,16 +73,22 @@ pub struct SkeletonJson {
 pub(crate) struct SkeletonJsonLoader;
 
 impl AssetLoader for SkeletonJsonLoader {
+    type Asset = SkeletonJson;
+    type Settings = ();
+    type Error = SpineLoaderError;
+
     fn load<'a>(
         &'a self,
-        bytes: &'a [u8],
-        load_context: &'a mut LoadContext,
-    ) -> BoxedFuture<'a, Result<(), anyhow::Error>> {
+        reader: &'a mut Reader,
+        _settings: &'a Self::Settings,
+        _load_context: &'a mut LoadContext,
+    ) -> BoxedFuture<'a, Result<Self::Asset, Self::Error>> {
         Box::pin(async move {
-            load_context.set_default_asset(LoadedAsset::new(SkeletonJson {
+            let mut bytes = Vec::new();
+            reader.read_to_end(&mut bytes).await?;
+            Ok(SkeletonJson {
                 json: bytes.to_vec(),
-            }));
-            Ok(())
+            })
         })
     }
 
@@ -86,7 +100,7 @@ impl AssetLoader for SkeletonJsonLoader {
 /// Bevy asset for [`rusty_spine::SkeletonBinary`], loaded from `.skel` files.
 ///
 /// For loading a complete skeleton, see [`SkeletonData`].
-#[derive(Debug, TypeUuid, TypePath)]
+#[derive(Asset, Debug, TypeUuid, TypePath)]
 #[uuid = "2a2a342a-29ae-4417-adf5-06ea7f0732d0"]
 pub struct SkeletonBinary {
     pub binary: Vec<u8>,
@@ -96,16 +110,22 @@ pub struct SkeletonBinary {
 pub(crate) struct SkeletonBinaryLoader;
 
 impl AssetLoader for SkeletonBinaryLoader {
+    type Asset = SkeletonBinary;
+    type Settings = ();
+    type Error = SpineLoaderError;
+
     fn load<'a>(
         &'a self,
-        bytes: &'a [u8],
-        load_context: &'a mut LoadContext,
-    ) -> BoxedFuture<'a, Result<(), anyhow::Error>> {
+        reader: &'a mut Reader,
+        _settings: &'a Self::Settings,
+        _load_context: &'a mut LoadContext,
+    ) -> BoxedFuture<'a, Result<Self::Asset, Self::Error>> {
         Box::pin(async move {
-            load_context.set_default_asset(LoadedAsset::new(SkeletonBinary {
+            let mut bytes = Vec::new();
+            reader.read_to_end(&mut bytes).await?;
+            Ok(SkeletonBinary {
                 binary: bytes.to_vec(),
-            }));
-            Ok(())
+            })
         })
     }
 
@@ -118,7 +138,7 @@ impl AssetLoader for SkeletonBinaryLoader {
 /// skeleton (either [`SkeletonJson`] or [`SkeletonBinary`]).
 ///
 /// See [`SkeletonData::new_from_json`] or [`SkeletonData::new_from_binary`].
-#[derive(Debug, TypeUuid, TypePath)]
+#[derive(Asset, Debug, TypeUuid, TypePath)]
 #[uuid = "7796a37b-37a4-49ea-bf4e-fb7344aa6015"]
 pub struct SkeletonData {
     pub atlas_handle: Handle<Atlas>,
