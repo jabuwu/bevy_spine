@@ -15,7 +15,6 @@ exclude = [
 rusty_spine = "0.6"
 bevy = { version = "0.12", default-features = false, features = [ "bevy_render", "bevy_asset", "bevy_sprite" ] }
 glam = { version = "0.24", features = [ "mint" ] }
-anyhow = "1.0"
 thiserror = "1.0.50"
 
 [dev-dependencies]
