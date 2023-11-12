@@ -20,3 +20,9 @@ thiserror = "1.0.50"
 [dev-dependencies]
 lerp = "0.4"
 bevy = { version = "0.12", default-features = true }
+
+[workspace]
+resolver = "2"
+members = [
+    "ci"
+]

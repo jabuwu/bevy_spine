@@ -37,11 +37,11 @@ pub trait SpineMaterial: Sized {
     /// If this function returns [`Some`], then the material will be applied to the [`SpineMesh`],
     /// otherwise it will be removed. Default materials should be removed if a custom material is
     /// desired (see [`SpineSettings::default_materials`]).
-    fn update<'w, 's>(
+    fn update(
         material: Option<Self::Material>,
         entity: Entity,
         renderable_data: SpineMaterialInfo,
-        params: &StaticSystemParam<Self::Params<'w, 's>>,
+        params: &StaticSystemParam<Self::Params<'_, '_>>,
     ) -> Option<Self::Material>;
 }
 
@@ -79,11 +79,11 @@ pub struct SpineMaterialInfo {
 }
 
 #[allow(clippy::type_complexity, clippy::too_many_arguments)]
-fn update_materials<'w, 's, T: SpineMaterial>(
+fn update_materials<T: SpineMaterial>(
     mut commands: Commands,
     mut materials: ResMut<Assets<T::Material>>,
     mesh_query: Query<(Entity, &SpineMesh, Option<&Handle<T::Material>>)>,
-    params: StaticSystemParam<T::Params<'w, 's>>,
+    params: StaticSystemParam<T::Params<'_, '_>>,
 ) {
     for (mesh_entity, spine_mesh, material_handle) in mesh_query.iter() {
         let SpineMeshState::Renderable { info: data } = spine_mesh.state.clone() else {
@@ -102,12 +102,10 @@ fn update_materials<'w, 's, T: SpineMaterial>(
             } else {
                 materials.remove(handle);
             }
-        } else {
-            if let Some(material) = T::update(None, spine_mesh.spine_entity, data, &params) {
-                let handle = materials.add(material);
-                if let Some(mut entity_commands) = commands.get_entity(mesh_entity) {
-                    entity_commands.insert(handle.clone());
-                }
+        } else if let Some(material) = T::update(None, spine_mesh.spine_entity, data, &params) {
+            let handle = materials.add(material);
+            if let Some(mut entity_commands) = commands.get_entity(mesh_entity) {
+                entity_commands.insert(handle.clone());
             }
         };
     }
@@ -161,12 +159,13 @@ macro_rules! material {
                 layout: &MeshVertexBufferLayout,
                 _key: Material2dKey<Self>,
             ) -> Result<(), SpecializedMeshPipelineError> {
-                let mut vertex_attributes = Vec::new();
-                vertex_attributes.push(Mesh::ATTRIBUTE_POSITION.at_shader_location(0));
-                vertex_attributes.push(Mesh::ATTRIBUTE_NORMAL.at_shader_location(1));
-                vertex_attributes.push(Mesh::ATTRIBUTE_UV_0.at_shader_location(2));
-                vertex_attributes.push(Mesh::ATTRIBUTE_COLOR.at_shader_location(4));
-                vertex_attributes.push(DARK_COLOR_ATTRIBUTE.at_shader_location(DARK_COLOR_SHADER_POSITION as u32));
+                let vertex_attributes = vec![
+                    Mesh::ATTRIBUTE_POSITION.at_shader_location(0),
+                    Mesh::ATTRIBUTE_NORMAL.at_shader_location(1),
+                    Mesh::ATTRIBUTE_UV_0.at_shader_location(2),
+                    Mesh::ATTRIBUTE_COLOR.at_shader_location(4),
+                    DARK_COLOR_ATTRIBUTE.at_shader_location(DARK_COLOR_SHADER_POSITION as u32),
+                ];
                 let vertex_buffer_layout = layout.get_layout(&vertex_attributes)?;
                 descriptor.vertex.buffers = vec![vertex_buffer_layout];
                 if let Some(fragment) = &mut descriptor.fragment {
@@ -183,11 +182,11 @@ macro_rules! material {
             type Material = Self;
             type Params<'w, 's> = SpineSettingsQuery<'w, 's>;
 
-            fn update<'w, 's>(
+            fn update(
                 material: Option<Self>,
                 entity: Entity,
                 renderable_data: SpineMaterialInfo,
-                params: &StaticSystemParam<Self::Params<'w, 's>>,
+                params: &StaticSystemParam<Self::Params<'_, '_>>,
             ) -> Option<Self> {
                 let spine_settings = params.spine_settings_query.get(entity).copied().unwrap_or(SpineSettings::default());
                 if spine_settings.default_materials && renderable_data.blend_mode == $blend_mode && renderable_data.premultiplied_alpha == $premultiplied_alpha {

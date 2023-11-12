@@ -72,10 +72,8 @@ fn crossfades(mut spine_query: Query<&mut Spine>, time: Res<Time>) {
             if current_animation != "walk" {
                 let _ = spine.animation_state.set_animation_by_name(0, "walk", true);
             }
-        } else {
-            if current_animation != "idle" {
-                let _ = spine.animation_state.set_animation_by_name(0, "idle", true);
-            }
+        } else if current_animation != "idle" {
+            let _ = spine.animation_state.set_animation_by_name(0, "idle", true);
         }
     }
 }

@@ -109,13 +109,13 @@ impl Material2d for MyMaterial {
         layout: &MeshVertexBufferLayout,
         _key: Material2dKey<Self>,
     ) -> Result<(), SpecializedMeshPipelineError> {
-        let mut vertex_attributes = Vec::new();
-        vertex_attributes.push(Mesh::ATTRIBUTE_POSITION.at_shader_location(0));
-        vertex_attributes.push(Mesh::ATTRIBUTE_NORMAL.at_shader_location(1));
-        vertex_attributes.push(Mesh::ATTRIBUTE_UV_0.at_shader_location(2));
-        vertex_attributes.push(Mesh::ATTRIBUTE_COLOR.at_shader_location(4));
-        vertex_attributes
-            .push(DARK_COLOR_ATTRIBUTE.at_shader_location(DARK_COLOR_SHADER_POSITION as u32));
+        let vertex_attributes = vec![
+            Mesh::ATTRIBUTE_POSITION.at_shader_location(0),
+            Mesh::ATTRIBUTE_NORMAL.at_shader_location(1),
+            Mesh::ATTRIBUTE_UV_0.at_shader_location(2),
+            Mesh::ATTRIBUTE_COLOR.at_shader_location(4),
+            DARK_COLOR_ATTRIBUTE.at_shader_location(DARK_COLOR_SHADER_POSITION as u32),
+        ];
         let vertex_buffer_layout = layout.get_layout(&vertex_attributes)?;
         descriptor.vertex.buffers = vec![vertex_buffer_layout];
         descriptor.primitive.cull_mode = None;
@@ -133,14 +133,14 @@ impl SpineMaterial for MyMaterial {
     type Material = Self;
     type Params<'w, 's> = MyMaterialParam<'w, 's>;
 
-    fn update<'w, 's>(
+    fn update(
         material: Option<Self>,
         entity: Entity,
         renderable_data: SpineMaterialInfo,
-        params: &StaticSystemParam<Self::Params<'w, 's>>,
+        params: &StaticSystemParam<Self::Params<'_, '_>>,
     ) -> Option<Self> {
         if let Ok(spine) = params.my_spine_query.get(entity) {
-            let mut material = material.unwrap_or_else(|| Self::default());
+            let mut material = material.unwrap_or_default();
             material.image = renderable_data.texture;
             material.time = params.time.elapsed_seconds();
             if let Some(slot) = spine

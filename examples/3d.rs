@@ -142,11 +142,11 @@ impl SpineMaterial for Spine3DMaterial {
     type Material = StandardMaterial;
     type Params<'w, 's> = SpineSettingsQuery<'w, 's>;
 
-    fn update<'w, 's>(
+    fn update(
         material: Option<Self::Material>,
         entity: Entity,
         renderable_data: SpineMaterialInfo,
-        params: &StaticSystemParam<Self::Params<'w, 's>>,
+        params: &StaticSystemParam<Self::Params<'_, '_>>,
     ) -> Option<Self::Material> {
         let spine_settings = params
             .spine_settings_query

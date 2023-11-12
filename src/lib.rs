@@ -506,7 +506,7 @@ pub enum SpineEvent {
     },
 }
 
-/// Queued ready events, to be sent after [`SpineSet::SpawnFlush`].
+/// Queued ready events, to be sent after [`SpineSystem::SpawnFlush`].
 #[derive(Default, Resource)]
 struct SpineReadyEvents(Vec<SpineReadyEvent>);
 
@@ -844,6 +844,7 @@ pub enum SkeletonRenderableKind {
     Combined(Vec<SkeletonCombinedRenderable>),
 }
 
+#[allow(clippy::type_complexity)]
 fn spine_update_meshes(
     mut spine_query: Query<(&mut Spine, Option<&SpineSettings>)>,
     mut meshes: ResMut<Assets<Mesh>>,
@@ -951,7 +952,7 @@ fn spine_update_meshes(
                                 renderable.vertices.len()
                             ];
                             (
-                                Some(renderable.slot_index as usize),
+                                Some(renderable.slot_index),
                                 renderable.attachment_renderer_object,
                                 take(&mut renderable.vertices),
                                 take(&mut renderable.indices),
@@ -1057,7 +1058,7 @@ fn adjust_spine_textures(
     }
     let mut removed_handles = vec![];
     for (handle_index, (handle, handle_config)) in local.handles.iter().enumerate() {
-        if let Some(image) = images.get_mut(&*handle) {
+        if let Some(image) = images.get_mut(handle) {
             fn convert_filter(filter: AtlasFilter) -> ImageFilterMode {
                 match filter {
                     AtlasFilter::Nearest => ImageFilterMode::Nearest,
@@ -1091,7 +1092,7 @@ fn adjust_spine_textures(
             if handle_config.premultiplied_alpha {
                 for i in 0..(image.data.len() / 4) {
                     let mut rgba = Color::rgba_u8(
-                        image.data[i * 4 + 0],
+                        image.data[i * 4],
                         image.data[i * 4 + 1],
                         image.data[i * 4 + 2],
                         image.data[i * 4 + 3],

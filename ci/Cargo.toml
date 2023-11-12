@@ -1,0 +1,9 @@
+[package]
+name = "ci"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow = "1.0.70"
+xshell = "0.2"
+bitflags = "2.0"
