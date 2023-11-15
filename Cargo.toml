@@ -12,7 +12,7 @@ exclude = [
 ]
 
 [dependencies]
-rusty_spine = "0.6"
+rusty_spine = "0.7"
 bevy = { version = "0.12", default-features = false, features = [ "bevy_render", "bevy_asset", "bevy_sprite" ] }
 glam = { version = "0.24", features = [ "mint" ] }
 thiserror = "1.0.50"
