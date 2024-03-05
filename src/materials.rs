@@ -8,7 +8,7 @@ use bevy::{
     asset::Asset,
     ecs::system::{StaticSystemParam, SystemParam},
     prelude::*,
-    reflect::{TypePath, TypeUuid},
+    reflect::TypePath,
     render::{
         mesh::{MeshVertexAttribute, MeshVertexBufferLayout},
         render_resource::{
@@ -131,8 +131,7 @@ pub struct SpineSettingsQuery<'w, 's> {
 macro_rules! material {
     ($(#[$($attrss:tt)*])* $uuid:literal, $name:ident, $blend_mode:expr, $premultiplied_alpha:expr, $blend_state:expr) => {
         $(#[$($attrss)*])*
-        #[derive(Asset, Default, AsBindGroup, TypeUuid, TypePath, Clone)]
-        #[uuid = $uuid]
+        #[derive(Asset, Default, AsBindGroup, TypePath, Clone)]
         pub struct $name {
             #[texture(0)]
             #[sampler(1)]

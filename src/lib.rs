@@ -13,6 +13,7 @@ use bevy::{
     prelude::*,
     render::{
         mesh::{Indices, MeshVertexAttribute},
+        render_asset::RenderAssetUsages,
         render_resource::{PrimitiveTopology, VertexFormat},
         texture::{ImageAddressMode, ImageFilterMode, ImageSampler, ImageSamplerDescriptor},
     },
@@ -714,8 +715,10 @@ fn spine_spawn(
                                     .with_children(|parent| {
                                         let mut z = 0.;
                                         for (index, _) in controller.skeleton.slots().enumerate() {
-                                            let mut mesh =
-                                                Mesh::new(PrimitiveTopology::TriangleList);
+                                            let mut mesh = Mesh::new(
+                                                PrimitiveTopology::TriangleList,
+                                                RenderAssetUsages::MAIN_WORLD,
+                                            );
                                             empty_mesh(&mut mesh);
                                             let mesh_handle = meshes.add(mesh);
                                             parent.spawn((
@@ -990,7 +993,7 @@ fn spine_update_meshes(
                     for _ in 0..vertices.len() {
                         normals.push([0., 0., 0.]);
                     }
-                    mesh.set_indices(Some(Indices::U16(indices)));
+                    mesh.insert_indices(Indices::U16(indices));
                     mesh.insert_attribute(
                         MeshVertexAttribute::new("Vertex_Position", 0, VertexFormat::Float32x2),
                         vertices,
@@ -1022,15 +1025,13 @@ fn spine_update_meshes(
 }
 
 fn empty_mesh(mesh: &mut Mesh) {
-    let indices = Indices::U32(vec![]);
-
     let positions: Vec<[f32; 3]> = vec![];
     let normals: Vec<[f32; 3]> = vec![];
     let uvs: Vec<[f32; 2]> = vec![];
     let colors: Vec<[f32; 4]> = vec![];
     let dark_colors: Vec<[f32; 4]> = vec![];
 
-    mesh.set_indices(Some(indices));
+    mesh.remove_indices();
     mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, positions);
     mesh.insert_attribute(Mesh::ATTRIBUTE_NORMAL, normals);
     mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, uvs);
