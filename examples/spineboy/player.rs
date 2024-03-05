@@ -1,6 +1,5 @@
 use bevy::prelude::*;
 use bevy_spine::prelude::*;
-use lerp::Lerp;
 
 use crate::bullet::{BulletSpawnEvent, BulletSystem};
 
@@ -225,7 +224,8 @@ fn player_aim(
                     spine.animation_state.track_at_index_mut(PLAYER_TRACK_AIM)
                 {
                     let alpha = aim_track.alpha() * 2.5;
-                    aim_track.set_alpha(alpha.lerp(1., time.delta_seconds()).clamp(0., 1.));
+                    aim_track
+                        .set_alpha(lerp::Lerp::lerp(alpha, 1., time.delta_seconds()).clamp(0., 1.));
                 }
             }
         }
@@ -237,7 +237,7 @@ fn player_shoot(
     mut spine_query: Query<(&mut Spine, &Transform)>,
     mut bullet_spawn_events: EventWriter<BulletSpawnEvent>,
     global_transform_query: Query<&GlobalTransform>,
-    mouse_buttons: Res<Input<MouseButton>>,
+    mouse_buttons: Res<ButtonInput<MouseButton>>,
     time: Res<Time>,
 ) {
     for (mut shoot, player) in shoot_query.iter_mut() {
@@ -265,16 +265,16 @@ fn player_shoot(
 
 fn player_move(
     mut player_query: Query<(&mut Player, &mut Transform, &mut Spine)>,
-    keys: Res<Input<KeyCode>>,
+    keys: Res<ButtonInput<KeyCode>>,
     time: Res<Time>,
 ) {
     for (mut player, mut player_transform, mut player_spine) in player_query.iter_mut() {
         if player.spawned {
             let mut movement = 0.;
-            if keys.pressed(KeyCode::A) {
+            if keys.pressed(KeyCode::KeyA) {
                 movement -= 1.;
             }
-            if keys.pressed(KeyCode::D) {
+            if keys.pressed(KeyCode::KeyD) {
                 movement += 1.;
             }
             player.movement_velocity =
@@ -295,7 +295,7 @@ fn player_move(
     }
 }
 
-fn player_jump(mut player_query: Query<(&mut Spine, &Player)>, keys: Res<Input<KeyCode>>) {
+fn player_jump(mut player_query: Query<(&mut Spine, &Player)>, keys: Res<ButtonInput<KeyCode>>) {
     for (mut spine, player) in player_query.iter_mut() {
         if !player.spawned {
             continue;

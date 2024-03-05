@@ -21,6 +21,7 @@ pub fn test_app() -> App {
                     ..default()
                 }
                 .into(),
+                ..default()
             })
             .build()
             .disable::<WinitPlugin>(),
