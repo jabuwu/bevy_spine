@@ -419,7 +419,7 @@ impl Default for SpineSettings {
 ///     mut spine_ready_events: EventReader<SpineReadyEvent>,
 ///     mut spine_query: Query<&mut Spine, With<MySpine>>
 /// ) {
-///     for spine_ready_event in spine_ready_events.iter() {
+///     for spine_ready_event in spine_ready_events.read() {
 ///         if let Ok(mut spine) = spine_query.get_mut(spine_ready_event.entity) {
 ///             // the skeleton will start playing the animation the same frame it spawns on
 ///             spine.animation_state.set_animation_by_name(0, "animation", true);
@@ -466,7 +466,7 @@ pub struct SpineReadyEvent {
 ///     mut commands: Commands,
 ///     asset_server: Res<AssetServer>,
 /// ) {
-///     for event in spine_events.iter() {
+///     for event in spine_events.read() {
 ///         if let SpineEvent::Event { name, entity, .. } = event {
 ///             println!("spine event fired: {}", name);
 ///             println!("from entity: {:?}", entity);
