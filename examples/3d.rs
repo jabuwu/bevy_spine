@@ -45,14 +45,11 @@ fn setup(
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
     // plane
-    // commands.spawn(PbrBundle {
-    //     mesh: meshes.add(Plane3d::default().mesh().size(5.0, 5.0)),
-    //     material: materials.add(ColorMaterial {
-    //         color: Color::rgb(0.3, 0.5, 0.3),
-    //         ..default()
-    //     }),
-    //     ..default()
-    // });
+    commands.spawn(PbrBundle {
+        mesh: meshes.add(Plane3d::default().mesh().size(5.0, 5.0)),
+        material: materials.add(Color::rgb(0.3, 0.5, 0.3)),
+        ..default()
+    });
 
     // light
     commands.spawn(PointLightBundle {
