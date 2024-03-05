@@ -717,7 +717,8 @@ fn spine_spawn(
                                         for (index, _) in controller.skeleton.slots().enumerate() {
                                             let mut mesh = Mesh::new(
                                                 PrimitiveTopology::TriangleList,
-                                                RenderAssetUsages::MAIN_WORLD,
+                                                RenderAssetUsages::MAIN_WORLD
+                                                    | RenderAssetUsages::RENDER_WORLD,
                                             );
                                             empty_mesh(&mut mesh);
                                             let mesh_handle = meshes.add(mesh);
