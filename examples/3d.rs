@@ -46,8 +46,8 @@ fn setup(
 ) {
     // plane
     commands.spawn(PbrBundle {
-        mesh: meshes.add(shape::Plane::from_size(5.0).into()),
-        material: materials.add(Color::rgb(0.3, 0.5, 0.3).into()),
+        mesh: meshes.add(Plane3d::default().mesh().size(5.0, 5.0)),
+        material: materials.add(Color::rgb(0.3, 0.5, 0.3)),
         ..default()
     });
 
@@ -107,8 +107,8 @@ fn controls(
     mut window_query: Query<&mut Window, With<PrimaryWindow>>,
     mut mouse_motion_events: EventReader<MouseMotion>,
     mut orbit_query: Query<(&mut Orbit, &mut Transform)>,
-    mouse_buttons: Res<Input<MouseButton>>,
-    keys: Res<Input<KeyCode>>,
+    mouse_buttons: Res<ButtonInput<MouseButton>>,
+    keys: Res<ButtonInput<KeyCode>>,
 ) {
     let mut window = window_query.single_mut();
     if mouse_buttons.just_pressed(MouseButton::Left) {

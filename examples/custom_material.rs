@@ -1,7 +1,7 @@
 use bevy::{
     ecs::system::{StaticSystemParam, SystemParam},
     prelude::*,
-    reflect::{TypePath, TypeUuid},
+    reflect::TypePath,
     render::{
         mesh::MeshVertexBufferLayout,
         render_resource::{
@@ -85,8 +85,7 @@ fn on_spawn(
 #[derive(Component)]
 pub struct MySpine;
 
-#[derive(Asset, AsBindGroup, TypeUuid, TypePath, Clone, Default)]
-#[uuid = "2e85f9ae-049a-4bb5-9f5d-ebaaa208df60"]
+#[derive(Asset, AsBindGroup, TypePath, Clone, Default)]
 pub struct MyMaterial {
     #[texture(0)]
     #[sampler(1)]

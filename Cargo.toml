@@ -13,13 +13,13 @@ exclude = [
 
 [dependencies]
 rusty_spine = "0.7"
-bevy = { version = "0.12", default-features = false, features = [ "bevy_render", "bevy_asset", "bevy_sprite" ] }
-glam = { version = "0.24", features = [ "mint" ] }
+bevy = { version = "0.13", default-features = false, features = [ "bevy_render", "bevy_asset", "bevy_sprite" ] }
+glam = { version = "0.25", features = [ "mint" ] }
 thiserror = "1.0.50"
 
 [dev-dependencies]
-lerp = "0.4"
-bevy = { version = "0.12", default-features = true }
+lerp = "0.5"
+bevy = { version = "0.13", default-features = true }
 
 [workspace]
 resolver = "2"
