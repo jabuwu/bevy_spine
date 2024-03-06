@@ -1,3 +1,6 @@
+# 0.8.0
+- Update to Bevy 0.13
+
 # 0.7.0
 - Update to Bevy 0.12
 - Add `parent` to `SpineBone`
