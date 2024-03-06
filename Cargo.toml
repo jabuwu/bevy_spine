@@ -1,20 +1,22 @@
 [package]
 name = "bevy_spine"
-version = "0.7.0"
+version = "0.8.0"
 edition = "2021"
 description = "Spine plugin for Bevy utilizing rusty_spine"
 homepage = "https://github.com/jabuwu/bevy_spine"
 repository = "https://github.com/jabuwu/bevy_spine"
 readme = "readme.md"
 license-file = "LICENSE"
-exclude = [
-    "assets/*",
-]
+exclude = ["assets/*"]
 
 [dependencies]
 rusty_spine = "0.7"
-bevy = { version = "0.13", default-features = false, features = [ "bevy_render", "bevy_asset", "bevy_sprite" ] }
-glam = { version = "0.25", features = [ "mint" ] }
+bevy = { version = "0.13", default-features = false, features = [
+    "bevy_render",
+    "bevy_asset",
+    "bevy_sprite",
+] }
+glam = { version = "0.25", features = ["mint"] }
 thiserror = "1.0.50"
 
 [dev-dependencies]
@@ -23,6 +25,4 @@ bevy = { version = "0.13", default-features = true }
 
 [workspace]
 resolver = "2"
-members = [
-    "ci"
-]
+members = ["ci"]
