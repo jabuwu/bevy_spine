@@ -37,6 +37,7 @@ fn vertex(vertex: Vertex) -> VertexOutput {
     out.position = mesh_functions::mesh2d_position_world_to_clip(out.world_position);
     out.world_normal = mesh_functions::mesh2d_normal_local_to_world(vertex.normal, vertex.instance_index);
     out.color = vertex.color;
+    out.dark_color = vertex.dark_color;
     return out;
 }
 
@@ -51,7 +52,7 @@ fn fragment(
 ) -> @location(0) vec4<f32> {
     let tex_color = textureSample(texture, texture_sampler, input.uv);
     var color = vec4(
-        ((tex_color.a - 1.0) * input.dark_color.a + 1.0 - tex_color.rgb) * input.dark_color.rgb + tex_color.rgb * input.color.rgb,
+        ((tex_color.a - 1.0) * input.dark_color.a + 1.0 - tex_color.rgb) * (input.dark_color.rgb * input.color.a) + tex_color.rgb * input.color.rgb,
         tex_color.a * input.color.a,
     );
 #ifdef TONEMAP_IN_SHADER
