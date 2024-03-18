@@ -1,3 +1,6 @@
+# 0.8.1 (UNRELEASED)
+- Fix dark color applying incorrectly with premultiplied alpha
+
 # 0.8.0
 - Update to Bevy 0.13
 

@@ -37,6 +37,7 @@ fn vertex(vertex: Vertex) -> VertexOutput {
     out.position = mesh_functions::mesh2d_position_world_to_clip(out.world_position);
     out.world_normal = mesh_functions::mesh2d_normal_local_to_world(vertex.normal, vertex.instance_index);
     out.color = vertex.color;
+    out.dark_color = vertex.dark_color;
     return out;
 }
 
