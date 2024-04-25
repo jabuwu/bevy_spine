@@ -136,7 +136,7 @@ fn controls(
 }
 
 #[derive(Component)]
-pub struct Spine3DMaterial(StandardMaterial);
+pub struct Spine3DMaterial;
 
 impl SpineMaterial for Spine3DMaterial {
     type Material = StandardMaterial;
