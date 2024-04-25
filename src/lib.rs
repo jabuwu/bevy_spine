@@ -27,7 +27,7 @@ use materials::{
 use rusty_spine::{
     atlas::{AtlasFilter, AtlasWrap},
     controller::{SkeletonCombinedRenderable, SkeletonRenderable},
-    AnimationEvent, Skeleton,
+    AnimationEvent, Physics, Skeleton,
 };
 use textures::SpineTextureConfig;
 
@@ -833,7 +833,7 @@ fn spine_update_animation(
     spine_event_queue: Res<SpineEventQueue>,
 ) {
     for (_, mut spine) in spine_query.iter_mut() {
-        spine.update(time.delta_seconds());
+        spine.update(time.delta_seconds(), Physics::Update);
     }
     {
         let mut events = spine_event_queue.0.lock().unwrap();

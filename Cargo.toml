@@ -10,7 +10,7 @@ license-file = "LICENSE"
 exclude = ["assets/*"]
 
 [dependencies]
-rusty_spine = "0.7"
+rusty_spine = { git = "https://github.com/jabuwu/rusty_spine", branch = "spine_4.2" }
 bevy = { version = "0.13", default-features = false, features = [
     "bevy_render",
     "bevy_asset",
