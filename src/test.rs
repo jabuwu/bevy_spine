@@ -70,7 +70,7 @@ pub fn test_app_with_spineboy() -> App {
 fn spawn() {
     let mut app = test_app_with_spineboy();
     app.add_systems(Update, |spine_query: Query<&Spine>| {
-        assert_eq!(spine_query.single().skeleton.data().hash(), "itfFESDjM1c");
+        assert_eq!(spine_query.single().skeleton.data().hash(), "pvgSVWzpY9U");
     });
     app.update();
 }

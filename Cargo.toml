@@ -10,7 +10,7 @@ license-file = "LICENSE"
 exclude = ["assets/*"]
 
 [dependencies]
-rusty_spine = "0.7"
+rusty_spine = "0.8"
 bevy = { version = "0.13", default-features = false, features = [
     "bevy_render",
     "bevy_asset",
