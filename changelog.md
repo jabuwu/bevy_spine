@@ -1,4 +1,4 @@
-# 0.8.1 (UNRELEASED)
+# 0.8.1
 - Fix dark color applying incorrectly with premultiplied alpha
 
 # 0.8.0
