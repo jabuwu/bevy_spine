@@ -1,4 +1,10 @@
-# 0.8.1 (UNRELEASED)
+# 0.9.0
+- Upgrade runtime to Spine 4.2
+- Update to `rusty_spine` 0.8
+  - Add constraint APIs
+  - Add physics support
+
+# 0.8.1
 - Fix dark color applying incorrectly with premultiplied alpha
 
 # 0.8.0
