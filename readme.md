@@ -1,6 +1,6 @@
 # bevy_spine
 
-A Bevy Plugin for [Spine 4.1](http://esotericsoftware.com/), utilizing [rusty_spine](https://github.com/jabuwu/rusty_spine). WASM compatible!
+A Bevy Plugin for [Spine](http://esotericsoftware.com/), utilizing [rusty_spine](https://github.com/jabuwu/rusty_spine). WASM compatible!
 
 ```
 [dependencies]
@@ -14,7 +14,7 @@ bevy_spine = "0.8"
 
 | bevy_spine | rusty_spine | bevy | spine |
 | ---------- | ----------- | ---- | ----- |
-| main       | 0.7         | 0.13 | 4.1   |
+| main       | 0.8         | 0.13 | 4.2   |
 | 0.8        | 0.7         | 0.13 | 4.1   |
 | 0.7        | 0.7         | 0.12 | 4.1   |
 | 0.6        | 0.6         | 0.11 | 4.1   |
