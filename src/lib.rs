@@ -539,7 +539,7 @@ fn spine_load(
                 premultiplied_alpha,
             } = skeleton_data_asset;
             if matches!(status, SkeletonDataStatus::Loading) {
-                let atlas = if let Some(atlas) = atlases.get(atlas_handle.clone()) {
+                let atlas = if let Some(atlas) = atlases.get(atlas_handle) {
                     atlas
                 } else {
                     continue;
@@ -549,7 +549,7 @@ fn spine_load(
                 }
                 match kind {
                     SkeletonDataKind::JsonFile(json_handle) => {
-                        let json = if let Some(json) = jsons.get(json_handle.clone()) {
+                        let json = if let Some(json) = jsons.get(json_handle) {
                             json
                         } else {
                             continue;
@@ -566,7 +566,7 @@ fn spine_load(
                         }
                     }
                     SkeletonDataKind::BinaryFile(binary_handle) => {
-                        let binary = if let Some(binary) = binaries.get(binary_handle.clone()) {
+                        let binary = if let Some(binary) = binaries.get(binary_handle) {
                             binary
                         } else {
                             continue;
@@ -1051,7 +1051,6 @@ fn adjust_spine_textures(
     mut spine_texture_create_events: EventReader<SpineTextureCreateEvent>,
     mut images: ResMut<Assets<Image>>,
 ) {
-    use bevy::render::color::Color;
     for spine_texture_create_event in spine_texture_create_events.read() {
         local.handles.push((
             spine_texture_create_event.handle.clone(),
@@ -1093,36 +1092,31 @@ fn adjust_spine_textures(
             // multiplied in linear space to render properly in Bevy.
             if handle_config.premultiplied_alpha {
                 for i in 0..(image.data.len() / 4) {
-                    let mut rgba = Color::rgba_u8(
+                    let mut rgba = Srgba::rgba_u8(
                         image.data[i * 4],
                         image.data[i * 4 + 1],
                         image.data[i * 4 + 2],
                         image.data[i * 4 + 3],
                     );
-                    if rgba.a() != 0. {
-                        rgba = Color::rgba(
-                            rgba.r() / rgba.a(),
-                            rgba.g() / rgba.a(),
-                            rgba.b() / rgba.a(),
-                            rgba.a(),
+                    if rgba.alpha != 0. {
+                        rgba = Srgba::new(
+                            rgba.red / rgba.alpha,
+                            rgba.green / rgba.alpha,
+                            rgba.blue / rgba.alpha,
+                            rgba.alpha,
                         );
                     } else {
-                        rgba = Color::rgba(0., 0., 0., 0.);
+                        rgba = Srgba::new(0., 0., 0., 0.);
                     }
-                    let mut linear_rgba = rgba.as_linear_rgba_f32();
-                    linear_rgba[0] *= linear_rgba[3];
-                    linear_rgba[1] *= linear_rgba[3];
-                    linear_rgba[2] *= linear_rgba[3];
-                    rgba = Color::rgba_linear(
-                        linear_rgba[0],
-                        linear_rgba[1],
-                        linear_rgba[2],
-                        linear_rgba[3],
-                    )
-                    .as_rgba();
-                    for j in 0..4 {
-                        image.data[i * 4 + j] = (rgba.as_rgba_f32()[j] * 255.) as u8;
-                    }
+                    let mut linear_rgba = LinearRgba::from(rgba);
+                    linear_rgba.red *= linear_rgba.alpha;
+                    linear_rgba.green *= linear_rgba.alpha;
+                    linear_rgba.blue *= linear_rgba.alpha;
+                    rgba = Srgba::from(linear_rgba);
+                    image.data[i * 4] = (rgba.red * 255.) as u8;
+                    image.data[i * 4 + 1] = (rgba.green * 255.) as u8;
+                    image.data[i * 4 + 2] = (rgba.blue * 255.) as u8;
+                    image.data[i * 4 + 3] = (rgba.alpha * 255.) as u8;
                 }
             }
             removed_handles.push(handle_index);

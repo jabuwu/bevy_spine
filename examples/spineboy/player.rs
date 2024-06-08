@@ -175,30 +175,16 @@ fn player_aim(
     camera_query: Query<(Entity, &Camera)>,
     time: Res<Time>,
 ) {
-    let Some(window) = window_query.get_single().ok() else {
+    let (camera_entity, camera) = camera_query.single();
+    let camera_global_transform = global_transform_query.get(camera_entity).unwrap();
+    let Ok(window) = window_query.get_single() else {
         return;
     };
-    let cursor_position = if let Some(cursor_position) = window.cursor_position() {
-        if let Ok((camera_entity, camera)) = camera_query.get_single() {
-            if let Ok(camera_transform) = global_transform_query.get(camera_entity) {
-                let window_size = Vec2::new(
-                    window_query.single().width(),
-                    window_query.single().height(),
-                );
-                let ndc = (cursor_position / window_size) * 2.0 - Vec2::ONE;
-                let ndc_to_world =
-                    camera_transform.compute_matrix() * camera.projection_matrix().inverse();
-                let world_pos = ndc_to_world.project_point3(ndc.extend(-1.0));
-                world_pos.truncate() * Vec2::new(1., -1.)
-            } else {
-                Vec2::ZERO
-            }
-        } else {
-            Vec2::ZERO
-        }
-    } else {
-        Vec2::ZERO
-    };
+    let cursor_position = window
+        .cursor_position()
+        .and_then(|cursor| camera.viewport_to_world(camera_global_transform, cursor))
+        .map(|ray| ray.origin.truncate())
+        .unwrap_or(Vec2::ZERO);
     for (mut spine, player_entity, crosshair, player) in crosshair_query.iter_mut() {
         if player.spawned {
             if let Ok((crosshair_entity, crosshair_parent)) = bone_query.get(crosshair.bone) {
