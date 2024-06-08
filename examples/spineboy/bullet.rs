@@ -38,7 +38,7 @@ fn bullet_spawn(mut commands: Commands, mut bullet_spawn_events: EventReader<Bul
         commands
             .spawn(SpriteBundle {
                 sprite: Sprite {
-                    color: Color::RED,
+                    color: Srgba::RED.into(),
                     custom_size: Some(Vec2::ONE * 16.),
                     ..Default::default()
                 },

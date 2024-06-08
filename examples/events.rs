@@ -89,9 +89,9 @@ fn footstep_update(
 ) {
     for (mut transform, mut text, entity) in footstep_query.iter_mut() {
         transform.translation.y += time.delta_seconds() * 70.;
-        let mut alpha = text.sections[0].style.color.a();
+        let mut alpha = text.sections[0].style.color.alpha();
         alpha = (alpha - time.delta_seconds() * 2.).clamp(0., 1.);
-        text.sections[0].style.color.set_a(alpha);
+        text.sections[0].style.color.set_alpha(alpha);
         if alpha == 0. {
             commands.entity(entity).despawn();
         }

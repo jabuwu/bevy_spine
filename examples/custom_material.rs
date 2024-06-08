@@ -3,7 +3,7 @@ use bevy::{
     prelude::*,
     reflect::TypePath,
     render::{
-        mesh::MeshVertexBufferLayout,
+        mesh::MeshVertexBufferLayoutRef,
         render_resource::{
             AsBindGroup, RenderPipelineDescriptor, ShaderRef, SpecializedMeshPipelineError,
         },
@@ -105,7 +105,7 @@ impl Material2d for MyMaterial {
 
     fn specialize(
         descriptor: &mut RenderPipelineDescriptor,
-        layout: &MeshVertexBufferLayout,
+        layout: &MeshVertexBufferLayoutRef,
         _key: Material2dKey<Self>,
     ) -> Result<(), SpecializedMeshPipelineError> {
         let vertex_attributes = vec![
@@ -115,7 +115,7 @@ impl Material2d for MyMaterial {
             Mesh::ATTRIBUTE_COLOR.at_shader_location(4),
             DARK_COLOR_ATTRIBUTE.at_shader_location(DARK_COLOR_SHADER_POSITION as u32),
         ];
-        let vertex_buffer_layout = layout.get_layout(&vertex_attributes)?;
+        let vertex_buffer_layout = layout.0.get_layout(&vertex_attributes)?;
         descriptor.vertex.buffers = vec![vertex_buffer_layout];
         descriptor.primitive.cull_mode = None;
         Ok(())

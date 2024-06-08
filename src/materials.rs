@@ -10,7 +10,7 @@ use bevy::{
     prelude::*,
     reflect::TypePath,
     render::{
-        mesh::{MeshVertexAttribute, MeshVertexBufferLayout},
+        mesh::{MeshVertexAttribute, MeshVertexBufferLayoutRef},
         render_resource::{
             AsBindGroup, BlendComponent, BlendFactor, BlendOperation, BlendState,
             RenderPipelineDescriptor, ShaderRef, SpecializedMeshPipelineError, VertexFormat,
@@ -101,6 +101,9 @@ fn update_materials<T: SpineMaterial>(
                 *material = new_material;
             } else {
                 materials.remove(handle);
+                if let Some(mut entity_commands) = commands.get_entity(mesh_entity) {
+                    entity_commands.remove::<Handle<T::Material>>();
+                }
             }
         } else if let Some(material) = T::update(None, spine_mesh.spine_entity, data, &params) {
             let handle = materials.add(material);
@@ -155,7 +158,7 @@ macro_rules! material {
 
             fn specialize(
                 descriptor: &mut RenderPipelineDescriptor,
-                layout: &MeshVertexBufferLayout,
+                layout: &MeshVertexBufferLayoutRef,
                 _key: Material2dKey<Self>,
             ) -> Result<(), SpecializedMeshPipelineError> {
                 let vertex_attributes = vec![
@@ -165,7 +168,7 @@ macro_rules! material {
                     Mesh::ATTRIBUTE_COLOR.at_shader_location(4),
                     DARK_COLOR_ATTRIBUTE.at_shader_location(DARK_COLOR_SHADER_POSITION as u32),
                 ];
-                let vertex_buffer_layout = layout.get_layout(&vertex_attributes)?;
+                let vertex_buffer_layout = layout.0.get_layout(&vertex_attributes)?;
                 descriptor.vertex.buffers = vec![vertex_buffer_layout];
                 if let Some(fragment) = &mut descriptor.fragment {
                     if let Some(target_state) = &mut fragment.targets[0] {
