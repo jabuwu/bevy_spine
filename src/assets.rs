@@ -4,7 +4,6 @@ use bevy::{
     asset::{io::Reader, AssetLoader, AsyncReadExt, LoadContext},
     prelude::*,
     reflect::TypePath,
-    utils::BoxedFuture,
 };
 use rusty_spine::SpineError;
 use thiserror::Error;
@@ -33,24 +32,22 @@ impl AssetLoader for AtlasLoader {
     type Settings = ();
     type Error = SpineLoaderError;
 
-    fn load<'a>(
+    async fn load<'a>(
         &'a self,
-        reader: &'a mut Reader,
+        reader: &'a mut Reader<'_>,
         _settings: &'a Self::Settings,
-        load_context: &'a mut LoadContext,
-    ) -> BoxedFuture<'a, Result<Self::Asset, Self::Error>> {
-        Box::pin(async move {
-            let mut bytes = Vec::new();
-            reader.read_to_end(&mut bytes).await?;
-            Ok(Atlas {
-                atlas: Arc::new(rusty_spine::Atlas::new(
-                    &bytes,
-                    load_context
-                        .path()
-                        .parent()
-                        .unwrap_or_else(|| Path::new("")),
-                )?),
-            })
+        load_context: &'a mut LoadContext<'_>,
+    ) -> Result<Self::Asset, Self::Error> {
+        let mut bytes = Vec::new();
+        reader.read_to_end(&mut bytes).await?;
+        Ok(Atlas {
+            atlas: Arc::new(rusty_spine::Atlas::new(
+                &bytes,
+                load_context
+                    .path()
+                    .parent()
+                    .unwrap_or_else(|| Path::new("")),
+            )?),
         })
     }
 
@@ -75,18 +72,16 @@ impl AssetLoader for SkeletonJsonLoader {
     type Settings = ();
     type Error = SpineLoaderError;
 
-    fn load<'a>(
+    async fn load<'a>(
         &'a self,
-        reader: &'a mut Reader,
+        reader: &'a mut Reader<'_>,
         _settings: &'a Self::Settings,
-        _load_context: &'a mut LoadContext,
-    ) -> BoxedFuture<'a, Result<Self::Asset, Self::Error>> {
-        Box::pin(async move {
-            let mut bytes = Vec::new();
-            reader.read_to_end(&mut bytes).await?;
-            Ok(SkeletonJson {
-                json: bytes.to_vec(),
-            })
+        _load_context: &'a mut LoadContext<'_>,
+    ) -> Result<Self::Asset, Self::Error> {
+        let mut bytes = Vec::new();
+        reader.read_to_end(&mut bytes).await?;
+        Ok(SkeletonJson {
+            json: bytes.to_vec(),
         })
     }
 
@@ -111,18 +106,16 @@ impl AssetLoader for SkeletonBinaryLoader {
     type Settings = ();
     type Error = SpineLoaderError;
 
-    fn load<'a>(
+    async fn load<'a>(
         &'a self,
-        reader: &'a mut Reader,
+        reader: &'a mut Reader<'_>,
         _settings: &'a Self::Settings,
-        _load_context: &'a mut LoadContext,
-    ) -> BoxedFuture<'a, Result<Self::Asset, Self::Error>> {
-        Box::pin(async move {
-            let mut bytes = Vec::new();
-            reader.read_to_end(&mut bytes).await?;
-            Ok(SkeletonBinary {
-                binary: bytes.to_vec(),
-            })
+        _load_context: &'a mut LoadContext<'_>,
+    ) -> Result<Self::Asset, Self::Error> {
+        let mut bytes = Vec::new();
+        reader.read_to_end(&mut bytes).await?;
+        Ok(SkeletonBinary {
+            binary: bytes.to_vec(),
         })
     }
 
