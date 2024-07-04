@@ -1,3 +1,6 @@
+# 0.10.1
+- No code changes, fixed version in readme
+
 # 0.10.0
 - Update to Bevy 0.14
 - Fix old materials not being removed when swapping blend mode

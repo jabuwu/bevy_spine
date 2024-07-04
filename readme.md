@@ -5,7 +5,7 @@ A Bevy Plugin for [Spine](http://esotericsoftware.com/), utilizing [rusty_spine]
 ```
 [dependencies]
 bevy = "0.14"
-bevy_spine = "0.9"
+bevy_spine = "0.10"
 ```
 
 [See online demos!](https://jabuwu.github.io/bevy_spine_demos/) ([source repo](https://github.com/jabuwu/bevy_spine_demos))
