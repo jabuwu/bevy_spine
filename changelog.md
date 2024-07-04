@@ -1,3 +1,6 @@
+# 0.10.0
+- Update to Bevy 0.14
+
 # 0.9.0
 - Upgrade runtime to Spine 4.2
 - Update to `rusty_spine` 0.8
