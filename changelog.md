@@ -1,5 +1,6 @@
 # 0.10.0
 - Update to Bevy 0.14
+- Fix old materials not being removed when swapping blend mode
 
 # 0.9.0
 - Upgrade runtime to Spine 4.2
