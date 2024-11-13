@@ -1,4 +1,4 @@
-use std::{path::Path, sync::Arc};
+use std::sync::Arc;
 
 use bevy::{
     asset::{io::Reader, AssetLoader, AsyncReadExt, LoadContext},
@@ -44,9 +44,10 @@ impl AssetLoader for AtlasLoader {
             atlas: Arc::new(rusty_spine::Atlas::new(
                 &bytes,
                 load_context
-                    .path()
+                    .asset_path()
                     .parent()
-                    .unwrap_or_else(|| Path::new("")),
+                    .map(|path| path.to_string())
+                    .unwrap_or_default(),
             )?),
         })
     }
