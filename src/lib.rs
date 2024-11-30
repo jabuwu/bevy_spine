@@ -9,15 +9,11 @@ use std::{
 };
 
 use bevy::{
-    asset::load_internal_binary_asset,
-    prelude::*,
-    render::{
+    asset::load_internal_binary_asset, image::{ImageAddressMode, ImageFilterMode, ImageSampler, ImageSamplerDescriptor}, prelude::*, render::{
         mesh::{Indices, MeshVertexAttribute},
         render_asset::RenderAssetUsages,
         render_resource::{PrimitiveTopology, VertexFormat},
-        texture::{ImageAddressMode, ImageFilterMode, ImageSampler, ImageSamplerDescriptor},
-    },
-    sprite::{Material2dPlugin, Mesh2dHandle},
+    }, sprite::Material2dPlugin
 };
 use materials::{
     SpineAdditiveMaterial, SpineAdditivePmaMaterial, SpineMaterialInfo, SpineMultiplyMaterial,
@@ -258,36 +254,16 @@ impl core::ops::DerefMut for Spine {
 /// entities representing the bones of a skeleton (see [`SpineBone`]). These bones are not
 /// synchronized (see [`SpineSync`]), and can be disabled entirely using
 /// [`SpineLoader::without_children`].
-#[derive(Component, Debug)]
-pub enum SpineLoader {
-    /// The spine rig is still loading.
-    Loading {
-        /// If true, will spawn child entities for each bone in the skeleton (see [`SpineBone`]).
-        with_children: bool,
-    },
-    /// The spine rig is ready.
-    Ready,
-    /// The spine rig failed to load.
-    Failed,
-}
-
-impl Default for SpineLoader {
-    fn default() -> Self {
-        Self::new()
-    }
+#[derive(Default, Component, Debug)]
+pub struct SpineLoader {
+    pub skeleton: Handle<SkeletonData>,
+    /// If true, will spawn child entities for each bone in the skeleton (see [`SpineBone`]).
+    pub with_children: bool,
 }
 
 impl SpineLoader {
-    pub fn new() -> Self {
-        Self::with_children()
-    }
-
-    pub fn with_children() -> Self {
-        Self::Loading {
-            with_children: true,
-        }
-    }
-
+    // 0.15 TODO
+    /*
     /// Load a [`Spine`] entity without child entities containing [`SpineBone`] components.
     ///
     /// Renderable mesh child entities are still created.
@@ -304,10 +280,19 @@ impl SpineLoader {
     /// # }
     /// ```
     pub fn without_children() -> Self {
-        Self::Loading {
+        Self {
             with_children: false,
+            state: SpineLoadState::Loading,
         }
-    }
+    }*/
+}
+
+#[derive(Component, Default, Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SpineLoadState {
+    #[default]
+    Loading,
+    Ready,
+    Failed,
 }
 
 /// Settings for how this Spine updates and renders.
@@ -430,8 +415,8 @@ impl Default for SpineSettings {
 #[derive(Default, Bundle)]
 pub struct SpineBundle {
     pub loader: SpineLoader,
+    pub load_state: SpineLoadState,
     pub settings: SpineSettings,
-    pub skeleton: Handle<SkeletonData>,
     pub crossfades: Crossfades,
     pub transform: Transform,
     pub global_transform: GlobalTransform,
@@ -600,8 +585,8 @@ fn spine_load(
 fn spine_spawn(
     mut skeleton_query: Query<(
         &mut SpineLoader,
+        &mut SpineLoadState,
         Entity,
-        &Handle<SkeletonData>,
         Option<&Crossfades>,
     )>,
     mut commands: Commands,
@@ -610,10 +595,10 @@ fn spine_spawn(
     mut skeleton_data_assets: ResMut<Assets<SkeletonData>>,
     spine_event_queue: Res<SpineEventQueue>,
 ) {
-    for (mut spine_loader, spine_entity, data_handle, crossfades) in skeleton_query.iter_mut() {
-        if let SpineLoader::Loading { with_children } = spine_loader.as_ref() {
+    for (mut spine_loader, mut spine_load_state, spine_entity, crossfades) in skeleton_query.iter_mut() {
+        if matches!(spine_load_state.as_ref(), SpineLoadState::Loading) {
             let skeleton_data_asset =
-                if let Some(skeleton_data_asset) = skeleton_data_assets.get_mut(data_handle) {
+                if let Some(skeleton_data_asset) = skeleton_data_assets.get_mut(&spine_loader.skeleton) {
                     skeleton_data_asset
                 } else {
                     continue;
@@ -738,7 +723,7 @@ fn spine_spawn(
                                             z += 0.001;
                                         }
                                     });
-                                if *with_children {
+                                if spine_loader.with_children {
                                     spawn_bones(
                                         spine_entity,
                                         None,
@@ -751,7 +736,7 @@ fn spine_spawn(
                             })
                             .insert(Spine(controller));
                     }
-                    *spine_loader = SpineLoader::Ready;
+                    *spine_load_state = SpineLoadState::Ready;
                     ready_events.0.push(SpineReadyEvent {
                         entity: spine_entity,
                         bones,
@@ -759,7 +744,7 @@ fn spine_spawn(
                 }
                 SkeletonDataStatus::Loading => {}
                 SkeletonDataStatus::Failed => {
-                    *spine_loader = SpineLoader::Failed;
+                    *spine_load_state = SpineLoadState::Failed;
                 }
             }
         }
@@ -833,7 +818,7 @@ fn spine_update_animation(
     spine_event_queue: Res<SpineEventQueue>,
 ) {
     for (_, mut spine) in spine_query.iter_mut() {
-        spine.update(time.delta_seconds(), Physics::Update);
+        spine.update(time.delta_secs(), Physics::Update);
     }
     {
         let mut events = spine_event_queue.0.lock().unwrap();
@@ -856,8 +841,8 @@ fn spine_update_meshes(
         Entity,
         &mut SpineMesh,
         &mut Transform,
-        Option<&Mesh2dHandle>,
-        Option<&Handle<Mesh>>,
+        Option<&Mesh2d>,
+        Option<&Mesh3d>,
     )>,
     mut commands: Commands,
     meshes_query: Query<(&Parent, &Children), With<SpineMeshes>>,
@@ -908,14 +893,14 @@ fn spine_update_meshes(
                 apply_mesh!(
                     spine_2d_mesh,
                     mesh_type == SpineMeshType::Mesh2D,
-                    Mesh2dHandle(spine_mesh.handle.clone()),
-                    Mesh2dHandle
+                    Mesh2d(spine_mesh.handle.clone()),
+                    Mesh2d
                 );
                 apply_mesh!(
                     spine_3d_mesh,
                     mesh_type == SpineMeshType::Mesh3D,
-                    spine_mesh.handle.clone(),
-                    Handle<Mesh>
+                    Mesh3d(spine_mesh.handle.clone()),
+                    Mesh3d
                 );
                 let Some(mesh) = meshes.get_mut(&spine_mesh.handle) else {
                     continue;
