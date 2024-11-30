@@ -28,7 +28,7 @@ use crate::{SpineMesh, SpineMeshState, SpineSettings, SpineSystem};
 /// Implement the trait and add it with [`SpineMaterialPlugin`].
 pub trait SpineMaterial: Sized {
     /// The material type to apply to [`SpineMesh`]. Usually is `Self`.
-    type Material: Asset + Clone;
+    type Material: Material2d;
     /// System parameters to query when updating this material.
     type Params<'w, 's>: SystemParam;
 
@@ -82,7 +82,7 @@ pub struct SpineMaterialInfo {
 fn update_materials<T: SpineMaterial>(
     mut commands: Commands,
     mut materials: ResMut<Assets<T::Material>>,
-    mesh_query: Query<(Entity, &SpineMesh, Option<&Handle<T::Material>>)>,
+    mesh_query: Query<(Entity, &SpineMesh, Option<&MeshMaterial2d<T::Material>>)>,
     params: StaticSystemParam<T::Params<'_, '_>>,
 ) {
     for (mesh_entity, spine_mesh, material_handle) in mesh_query.iter() {
@@ -102,19 +102,19 @@ fn update_materials<T: SpineMaterial>(
             } else {
                 materials.remove(handle);
                 if let Some(mut entity_commands) = commands.get_entity(mesh_entity) {
-                    entity_commands.remove::<Handle<T::Material>>();
+                    entity_commands.remove::<MeshMaterial2d<T::Material>>();
                 }
             }
         } else if let Some(material) = T::update(None, spine_mesh.spine_entity, data, &params) {
             let handle = materials.add(material);
             if let Some(mut entity_commands) = commands.get_entity(mesh_entity) {
-                entity_commands.insert(handle.clone());
+                entity_commands.insert(MeshMaterial2d(handle.clone()));
             }
         };
     }
 }
 
-pub const DARK_COLOR_SHADER_POSITION: usize = 10;
+pub const DARK_COLOR_SHADER_POSITION: u64 = 10;
 pub const DARK_COLOR_ATTRIBUTE: MeshVertexAttribute = MeshVertexAttribute::new(
     "Vertex_DarkColor",
     DARK_COLOR_SHADER_POSITION,
