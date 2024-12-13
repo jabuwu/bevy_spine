@@ -1,9 +1,7 @@
 //! Demonstrates how to spawn a [`SpineBundle`] and use it in one frame.
 
 use bevy::{app::AppExit, core::FrameCount, prelude::*};
-use bevy_spine::{
-    SkeletonData, Spine, SpineBundle, SpinePlugin, SpineReadyEvent, SpineSet, SpineSystem,
-};
+use bevy_spine::prelude::*;
 
 #[derive(Debug, Hash, PartialEq, Eq, Clone, SystemSet)]
 pub enum ExampleSet {
@@ -40,7 +38,7 @@ fn setup(
     mut skeletons: ResMut<Assets<SkeletonData>>,
     mut demo_data: ResMut<DemoData>,
 ) {
-    commands.spawn(Camera2dBundle::default());
+    commands.spawn(Camera2d);
 
     let skeleton = SkeletonData::new_from_json(
         asset_server.load("spineboy/export/spineboy-pro.json"),
@@ -58,11 +56,16 @@ fn spawn(
     if !demo_data.spawned {
         if let Some(skeleton) = skeletons.get(&demo_data.skeleton_handle) {
             if skeleton.is_loaded() {
-                commands.spawn(SpineBundle {
-                    skeleton: demo_data.skeleton_handle.clone(),
-                    transform: Transform::from_xyz(0., -200., 0.).with_scale(Vec3::ONE * 0.5),
-                    ..Default::default()
-                });
+                commands.spawn((
+                    SpineLoader {
+                        skeleton: demo_data.skeleton_handle.clone(),
+                        ..Default::default()
+                    },
+                    SpineBundle {
+                        transform: Transform::from_xyz(0., -200., 0.).with_scale(Vec3::ONE * 0.5),
+                        ..Default::default()
+                    },
+                ));
                 demo_data.spawned = true;
                 println!("spawned on frame: {}", frame_count.0);
             }

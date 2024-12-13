@@ -42,11 +42,16 @@ pub fn test_app_with_spineboy() -> App {
                 asset_server.load("spineboy/export/spineboy.atlas"),
             );
             let skeleton_handle = skeletons.add(skeleton);
-            commands.spawn(SpineBundle {
-                skeleton: skeleton_handle.clone(),
-                transform: Transform::from_xyz(0., -200., 0.).with_scale(Vec3::ONE * 0.5),
-                ..Default::default()
-            });
+            commands.spawn((
+                SpineLoader {
+                    skeleton: skeleton_handle.clone(),
+                    ..Default::default()
+                },
+                SpineBundle {
+                    transform: Transform::from_xyz(0., -200., 0.).with_scale(Vec3::ONE * 0.5),
+                    ..Default::default()
+                },
+            ));
         },
     );
     let ready = Arc::new(AtomicBool::new(false));

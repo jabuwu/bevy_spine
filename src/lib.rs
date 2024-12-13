@@ -9,11 +9,15 @@ use std::{
 };
 
 use bevy::{
-    asset::load_internal_binary_asset, image::{ImageAddressMode, ImageFilterMode, ImageSampler, ImageSamplerDescriptor}, prelude::*, render::{
+    asset::load_internal_binary_asset,
+    image::{ImageAddressMode, ImageFilterMode, ImageSampler, ImageSamplerDescriptor},
+    prelude::*,
+    render::{
         mesh::{Indices, MeshVertexAttribute},
         render_asset::RenderAssetUsages,
         render_resource::{PrimitiveTopology, VertexFormat},
-    }, sprite::Material2dPlugin
+    },
+    sprite::Material2dPlugin,
 };
 use materials::{
     SpineAdditiveMaterial, SpineAdditivePmaMaterial, SpineMaterialInfo, SpineMultiplyMaterial,
@@ -584,7 +588,7 @@ fn spine_load(
 #[allow(clippy::too_many_arguments)]
 fn spine_spawn(
     mut skeleton_query: Query<(
-        &mut SpineLoader,
+        &SpineLoader,
         &mut SpineLoadState,
         Entity,
         Option<&Crossfades>,
@@ -595,14 +599,16 @@ fn spine_spawn(
     mut skeleton_data_assets: ResMut<Assets<SkeletonData>>,
     spine_event_queue: Res<SpineEventQueue>,
 ) {
-    for (mut spine_loader, mut spine_load_state, spine_entity, crossfades) in skeleton_query.iter_mut() {
+    for (spine_loader, mut spine_load_state, spine_entity, crossfades) in skeleton_query.iter_mut()
+    {
         if matches!(spine_load_state.as_ref(), SpineLoadState::Loading) {
-            let skeleton_data_asset =
-                if let Some(skeleton_data_asset) = skeleton_data_assets.get_mut(&spine_loader.skeleton) {
-                    skeleton_data_asset
-                } else {
-                    continue;
-                };
+            let skeleton_data_asset = if let Some(skeleton_data_asset) =
+                skeleton_data_assets.get_mut(&spine_loader.skeleton)
+            {
+                skeleton_data_asset
+            } else {
+                continue;
+            };
             match &skeleton_data_asset.status {
                 SkeletonDataStatus::Loaded(skeleton_data) => {
                     let mut animation_state_data = AnimationStateData::new(skeleton_data.clone());
