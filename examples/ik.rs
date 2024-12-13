@@ -1,8 +1,5 @@
 use bevy::{prelude::*, window::PrimaryWindow};
-use bevy_spine::{
-    SkeletonController, SkeletonData, Spine, SpineBone, SpineBundle, SpinePlugin, SpineReadyEvent,
-    SpineSet, SpineSync, SpineSyncSet,
-};
+use bevy_spine::prelude::*;
 
 #[derive(Component)]
 pub struct Crosshair;
@@ -26,7 +23,7 @@ fn setup(
     mut commands: Commands,
     mut skeletons: ResMut<Assets<SkeletonData>>,
 ) {
-    commands.spawn(Camera2dBundle::default());
+    commands.spawn(Camera2d);
 
     let skeleton = SkeletonData::new_from_json(
         asset_server.load("spineboy/export/spineboy-pro.json"),
@@ -35,9 +32,12 @@ fn setup(
     let skeleton_handle = skeletons.add(skeleton);
 
     commands.spawn((
+        SpineLoader {
+            skeleton: skeleton_handle.clone(),
+            ..Default::default()
+        },
         SpineBundle {
             transform: Transform::from_xyz(-200., -200., 0.).with_scale(Vec3::splat(0.5)),
-            skeleton: skeleton_handle.clone(),
             ..Default::default()
         },
         SpineSync,
@@ -82,7 +82,11 @@ fn ik(
     let window = window_query.single();
     let cursor_position = window
         .cursor_position()
-        .and_then(|cursor| camera.viewport_to_world(camera_global_transform, cursor))
+        .and_then(|cursor| {
+            camera
+                .viewport_to_world(camera_global_transform, cursor)
+                .ok()
+        })
         .map(|ray| ray.origin.truncate())
         .unwrap_or(Vec2::ZERO);
 

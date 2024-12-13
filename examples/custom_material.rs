@@ -15,8 +15,8 @@ use bevy_spine::{
         SpineMaterial, SpineMaterialInfo, SpineMaterialPlugin, DARK_COLOR_ATTRIBUTE,
         DARK_COLOR_SHADER_POSITION,
     },
-    SkeletonController, SkeletonData, Spine, SpineBundle, SpineDrawer, SpinePlugin,
-    SpineReadyEvent, SpineSet, SpineSettings,
+    prelude::*,
+    SpineDrawer,
 };
 
 fn main() {
@@ -37,7 +37,7 @@ fn setup(
     mut commands: Commands,
     mut skeletons: ResMut<Assets<SkeletonData>>,
 ) {
-    commands.spawn(Camera2dBundle::default());
+    commands.spawn(Camera2d);
 
     let skeleton = SkeletonData::new_from_json(
         asset_server.load("spineboy/export/spineboy-pro.json"),
@@ -46,16 +46,24 @@ fn setup(
     let skeleton_handle = skeletons.add(skeleton);
 
     // Spine with no custom materials
-    commands.spawn((SpineBundle {
-        skeleton: skeleton_handle.clone(),
-        transform: Transform::from_xyz(-230., -130., 0.).with_scale(Vec3::ONE * 0.375),
-        ..Default::default()
-    },));
+    commands.spawn((
+        SpineLoader {
+            skeleton: skeleton_handle.clone(),
+            ..Default::default()
+        },
+        SpineBundle {
+            transform: Transform::from_xyz(-230., -130., 0.).with_scale(Vec3::ONE * 0.375),
+            ..Default::default()
+        },
+    ));
 
     // Spine with custom materials
     commands.spawn((
-        SpineBundle {
+        SpineLoader {
             skeleton: skeleton_handle.clone(),
+            ..Default::default()
+        },
+        SpineBundle {
             transform: Transform::from_xyz(230., -130., 0.).with_scale(Vec3::ONE * 0.375),
             settings: SpineSettings {
                 default_materials: false,
@@ -141,7 +149,7 @@ impl SpineMaterial for MyMaterial {
         if let Ok(spine) = params.my_spine_query.get(entity) {
             let mut material = material.unwrap_or_default();
             material.image = renderable_data.texture;
-            material.time = params.time.elapsed_seconds();
+            material.time = params.time.elapsed_secs();
             if let Some(slot) = spine
                 .skeleton
                 .slot_at_index(renderable_data.slot_index.unwrap_or(9999))
