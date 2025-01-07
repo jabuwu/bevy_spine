@@ -1,8 +1,5 @@
 use bevy::{prelude::*, window::PrimaryWindow};
-use bevy_spine::{
-    SkeletonController, SkeletonData, Spine, SpineBone, SpineBundle, SpinePlugin, SpineReadyEvent,
-    SpineSet, SpineSync, SpineSyncSet,
-};
+use bevy_spine::prelude::*;
 
 #[derive(Component)]
 pub struct Crosshair;
@@ -26,7 +23,7 @@ fn setup(
     mut commands: Commands,
     mut skeletons: ResMut<Assets<SkeletonData>>,
 ) {
-    commands.spawn(Camera2dBundle::default());
+    commands.spawn(Camera2d);
 
     let skeleton = SkeletonData::new_from_json(
         asset_server.load("spineboy/export/spineboy-pro.json"),
@@ -36,8 +33,11 @@ fn setup(
 
     commands.spawn((
         SpineBundle {
+            loader: SpineLoader {
+                skeleton: skeleton_handle.clone(),
+                ..Default::default()
+            },
             transform: Transform::from_xyz(-200., -200., 0.).with_scale(Vec3::splat(0.5)),
-            skeleton: skeleton_handle.clone(),
             ..Default::default()
         },
         SpineSync,
@@ -79,19 +79,25 @@ fn ik(
 ) {
     let (camera_entity, camera) = camera_query.single();
     let camera_global_transform = global_transform_query.get(camera_entity).unwrap();
-    let window = window_query.single();
-    let cursor_position = window
-        .cursor_position()
-        .and_then(|cursor| camera.viewport_to_world(camera_global_transform, cursor))
-        .map(|ray| ray.origin.truncate())
-        .unwrap_or(Vec2::ZERO);
+    let window = window_query.get_single();
+    if let Ok(window) = window {
+        let cursor_position = window
+            .cursor_position()
+            .and_then(|cursor| {
+                camera
+                    .viewport_to_world(camera_global_transform, cursor)
+                    .ok()
+            })
+            .map(|ray| ray.origin.truncate())
+            .unwrap_or(Vec2::ZERO);
 
-    if let Ok((mut crosshair_transform, crosshair_bone)) = crosshair_query.get_single_mut() {
-        let parent_global_transform = global_transform_query
-            .get(crosshair_bone.parent.as_ref().unwrap().entity)
-            .unwrap();
-        crosshair_transform.translation = (parent_global_transform.compute_matrix().inverse()
-            * Vec4::new(cursor_position.x, cursor_position.y, 0., 1.))
-        .truncate();
+        if let Ok((mut crosshair_transform, crosshair_bone)) = crosshair_query.get_single_mut() {
+            let parent_global_transform = global_transform_query
+                .get(crosshair_bone.parent.as_ref().unwrap().entity)
+                .unwrap();
+            crosshair_transform.translation = (parent_global_transform.compute_matrix().inverse()
+                * Vec4::new(cursor_position.x, cursor_position.y, 0., 1.))
+            .truncate();
+        }
     }
 }

@@ -16,7 +16,7 @@ fn setup(
     mut player_spawn_events: EventWriter<PlayerSpawnEvent>,
     asset_server: Res<AssetServer>,
 ) {
-    commands.spawn(Camera2dBundle::default());
+    commands.spawn(Camera2d);
 
     let skeleton = SkeletonData::new_from_binary(
         asset_server.load("spineboy/export/spineboy-pro.skel"),
