@@ -1,12 +1,13 @@
 //! Materials for Spine meshes.
 //!
-//! To create a custom material for Spine, see [`SpineMaterial`].
+//! To create a custom material for Spine, see [`SpineMaterial2d`].
 
 use std::marker::PhantomData;
 
 use bevy::{
     asset::Asset,
     ecs::system::{StaticSystemParam, SystemParam},
+    pbr::{Material, MeshMaterial3d},
     prelude::*,
     reflect::TypePath,
     render::{
@@ -22,13 +23,15 @@ use rusty_spine::BlendMode;
 
 use crate::{SpineMesh, SpineMeshState, SpineSettings, SpineSystem};
 
+/////////////////////// 2D ///////////////////////
+
 /// Trait for automatically applying materials to [`SpineMesh`] entities. Used by the built-in
 /// materials but can also be used to create custom materials.
 ///
 /// Implement the trait and add it with [`SpineMaterialPlugin`].
-pub trait SpineMaterial: Sized {
+pub trait SpineMaterial2d: Sized {
     /// The material type to apply to [`SpineMesh`]. Usually is `Self`.
-    type Material: Asset + Clone;
+    type Material: Material2d;
     /// System parameters to query when updating this material.
     type Params<'w, 's>: SystemParam;
 
@@ -45,12 +48,12 @@ pub trait SpineMaterial: Sized {
     ) -> Option<Self::Material>;
 }
 
-/// Add support for a new [`SpineMaterial`].
-pub struct SpineMaterialPlugin<T: SpineMaterial> {
+/// Add support for a new [`SpineMaterial2d`].
+pub struct SpineMaterialPlugin<T: SpineMaterial2d> {
     _marker: PhantomData<T>,
 }
 
-impl<T: SpineMaterial> Default for SpineMaterialPlugin<T> {
+impl<T: SpineMaterial2d> Default for SpineMaterialPlugin<T> {
     fn default() -> Self {
         Self {
             _marker: PhantomData,
@@ -58,7 +61,7 @@ impl<T: SpineMaterial> Default for SpineMaterialPlugin<T> {
     }
 }
 
-impl<T: SpineMaterial + Send + Sync + 'static> Plugin for SpineMaterialPlugin<T> {
+impl<T: SpineMaterial2d + Send + Sync + 'static> Plugin for SpineMaterialPlugin<T> {
     fn build(&self, app: &mut App) {
         app.add_systems(
             Update,
@@ -79,10 +82,10 @@ pub struct SpineMaterialInfo {
 }
 
 #[allow(clippy::type_complexity, clippy::too_many_arguments)]
-fn update_materials<T: SpineMaterial>(
+fn update_materials<T: SpineMaterial2d>(
     mut commands: Commands,
     mut materials: ResMut<Assets<T::Material>>,
-    mesh_query: Query<(Entity, &SpineMesh, Option<&Handle<T::Material>>)>,
+    mesh_query: Query<(Entity, &SpineMesh, Option<&MeshMaterial2d<T::Material>>)>,
     params: StaticSystemParam<T::Params<'_, '_>>,
 ) {
     for (mesh_entity, spine_mesh, material_handle) in mesh_query.iter() {
@@ -102,19 +105,19 @@ fn update_materials<T: SpineMaterial>(
             } else {
                 materials.remove(handle);
                 if let Some(mut entity_commands) = commands.get_entity(mesh_entity) {
-                    entity_commands.remove::<Handle<T::Material>>();
+                    entity_commands.remove::<MeshMaterial2d<T::Material>>();
                 }
             }
         } else if let Some(material) = T::update(None, spine_mesh.spine_entity, data, &params) {
             let handle = materials.add(material);
             if let Some(mut entity_commands) = commands.get_entity(mesh_entity) {
-                entity_commands.insert(handle.clone());
+                entity_commands.insert(MeshMaterial2d(handle.clone()));
             }
         };
     }
 }
 
-pub const DARK_COLOR_SHADER_POSITION: usize = 10;
+pub const DARK_COLOR_SHADER_POSITION: u64 = 10;
 pub const DARK_COLOR_ATTRIBUTE: MeshVertexAttribute = MeshVertexAttribute::new(
     "Vertex_DarkColor",
     DARK_COLOR_SHADER_POSITION,
@@ -122,6 +125,7 @@ pub const DARK_COLOR_ATTRIBUTE: MeshVertexAttribute = MeshVertexAttribute::new(
 );
 
 pub const SHADER_HANDLE: Handle<Shader> = Handle::<Shader>::weak_from_u128(10655547040990968849);
+pub const SHADER3D_HANDLE: Handle<Shader> = Handle::<Shader>::weak_from_u128(12345678901234567890);
 
 /// A [`SystemParam`] to query [`SpineSettings`].
 ///
@@ -180,7 +184,7 @@ macro_rules! material {
             }
         }
 
-        impl SpineMaterial for $name {
+        impl SpineMaterial2d for $name {
             type Material = Self;
             type Params<'w, 's> = SpineSettingsQuery<'w, 's>;
 
@@ -354,3 +358,92 @@ material!(
         },
     }
 );
+
+///////////////////////////// 3D /////////////////////////////
+
+pub trait SpineMaterial3d: Sized {
+    /// The material type to apply to [`SpineMesh`]. Usually is `Self`.
+    type Material: Material;
+    /// System parameters to query when updating this material.
+    type Params<'w, 's>: SystemParam;
+
+    /// Ran every frame for every material and every [`SpineMesh`].
+    ///
+    /// If this function returns [`Some`], then the material will be applied to the [`SpineMesh`],
+    /// otherwise it will be removed. Default materials should be removed if a custom material is
+    /// desired (see [`SpineSettings::default_materials`]).
+    fn update(
+        material: Option<Self::Material>,
+        entity: Entity,
+        renderable_data: SpineMaterialInfo,
+        params: &StaticSystemParam<Self::Params<'_, '_>>,
+    ) -> Option<Self::Material>;
+}
+
+/// Add support for a new [`SpineMaterial3d`].
+pub struct SpineMaterialPlugin3d<T: SpineMaterial3d> {
+    _marker: PhantomData<T>,
+}
+
+impl<T: SpineMaterial3d> Default for SpineMaterialPlugin3d<T> {
+    fn default() -> Self {
+        Self {
+            _marker: PhantomData,
+        }
+    }
+}
+
+impl<T: SpineMaterial3d + Send + Sync + 'static> Plugin for SpineMaterialPlugin3d<T> {
+    fn build(&self, app: &mut App) {
+        app.add_systems(
+            Update,
+            update_materials3d::<T>
+                .in_set(SpineSystem::UpdateMaterials)
+                .after(SpineSystem::UpdateMeshes),
+        );
+    }
+}
+
+#[allow(clippy::type_complexity, clippy::too_many_arguments)]
+fn update_materials3d<T: SpineMaterial3d>(
+    mut commands: Commands,
+    mut materials: ResMut<Assets<T::Material>>,
+    mesh_query: Query<(Entity, &SpineMesh, Option<&MeshMaterial3d<T::Material>>)>,
+    params: StaticSystemParam<T::Params<'_, '_>>,
+) {
+    for (mesh_entity, spine_mesh, material_handle) in mesh_query.iter() {
+        let SpineMeshState::Renderable { info: data } = spine_mesh.state.clone() else {
+            continue;
+        };
+        if let Some((material, handle)) =
+            material_handle.and_then(|handle| materials.get_mut(handle).zip(Some(handle)))
+        {
+            if let Some(new_material) = T::update(
+                Some(material.clone()),
+                spine_mesh.spine_entity,
+                data,
+                &params,
+            ) {
+                *material = new_material;
+            } else {
+                materials.remove(handle);
+                if let Some(mut entity_commands) = commands.get_entity(mesh_entity) {
+                    entity_commands.remove::<MeshMaterial3d<T::Material>>();
+                }
+            }
+        } else if let Some(material) = T::update(None, spine_mesh.spine_entity, data, &params) {
+            let handle = materials.add(material);
+            if let Some(mut entity_commands) = commands.get_entity(mesh_entity) {
+                entity_commands.insert(MeshMaterial3d(handle.clone()));
+            }
+        };
+    }
+}
+
+/// A [`SystemParam`] to query [`SpineSettings`].
+///
+/// Mostly used for the built-in materials but may be useful for implementing other materials.
+#[derive(SystemParam)]
+pub struct Spine3dSettingsQuery<'w, 's> {
+    pub spine_settings_query: Query<'w, 's, &'static SpineSettings>,
+}
