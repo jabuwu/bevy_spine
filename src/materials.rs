@@ -27,6 +27,10 @@ use crate::{SpineMesh, SpineMeshState, SpineSettings, SpineSystem};
 ///
 /// Implement the trait and add it with [`SpineMaterialPlugin`].
 pub trait SpineMaterial: Sized {
+    type MeshMaterial: Component
+        + Clone
+        + Into<AssetId<Self::Material>>
+        + From<Handle<Self::Material>>;
     /// The material type to apply to [`SpineMesh`]. Usually is `Self`.
     type Material: Asset + Clone;
     /// System parameters to query when updating this material.
@@ -82,7 +86,7 @@ pub struct SpineMaterialInfo {
 fn update_materials<T: SpineMaterial>(
     mut commands: Commands,
     mut materials: ResMut<Assets<T::Material>>,
-    mesh_query: Query<(Entity, &SpineMesh, Option<&Handle<T::Material>>)>,
+    mesh_query: Query<(Entity, &SpineMesh, Option<&T::MeshMaterial>)>,
     params: StaticSystemParam<T::Params<'_, '_>>,
 ) {
     for (mesh_entity, spine_mesh, material_handle) in mesh_query.iter() {
@@ -90,7 +94,7 @@ fn update_materials<T: SpineMaterial>(
             continue;
         };
         if let Some((material, handle)) =
-            material_handle.and_then(|handle| materials.get_mut(handle).zip(Some(handle)))
+            material_handle.and_then(|handle| materials.get_mut(handle.clone()).zip(Some(handle)))
         {
             if let Some(new_material) = T::update(
                 Some(material.clone()),
@@ -100,21 +104,22 @@ fn update_materials<T: SpineMaterial>(
             ) {
                 *material = new_material;
             } else {
-                materials.remove(handle);
+                materials.remove(handle.clone());
                 if let Some(mut entity_commands) = commands.get_entity(mesh_entity) {
-                    entity_commands.remove::<Handle<T::Material>>();
+                    entity_commands.remove::<T::MeshMaterial>();
                 }
             }
         } else if let Some(material) = T::update(None, spine_mesh.spine_entity, data, &params) {
             let handle = materials.add(material);
             if let Some(mut entity_commands) = commands.get_entity(mesh_entity) {
-                entity_commands.insert(handle.clone());
+                entity_commands
+                    .insert(<T::MeshMaterial as From<Handle<T::Material>>>::from(handle));
             }
         };
     }
 }
 
-pub const DARK_COLOR_SHADER_POSITION: usize = 10;
+pub const DARK_COLOR_SHADER_POSITION: u64 = 10;
 pub const DARK_COLOR_ATTRIBUTE: MeshVertexAttribute = MeshVertexAttribute::new(
     "Vertex_DarkColor",
     DARK_COLOR_SHADER_POSITION,
@@ -181,6 +186,7 @@ macro_rules! material {
         }
 
         impl SpineMaterial for $name {
+            type MeshMaterial = MeshMaterial2d<Self>;
             type Material = Self;
             type Params<'w, 's> = SpineSettingsQuery<'w, 's>;
 

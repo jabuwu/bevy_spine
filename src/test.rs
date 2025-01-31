@@ -43,7 +43,7 @@ pub fn test_app_with_spineboy() -> App {
             );
             let skeleton_handle = skeletons.add(skeleton);
             commands.spawn(SpineBundle {
-                skeleton: skeleton_handle.clone(),
+                skeleton: skeleton_handle.clone().into(),
                 transform: Transform::from_xyz(0., -200., 0.).with_scale(Vec3::ONE * 0.5),
                 ..Default::default()
             });

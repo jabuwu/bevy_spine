@@ -37,7 +37,7 @@ fn setup(
     mut commands: Commands,
     mut skeletons: ResMut<Assets<SkeletonData>>,
 ) {
-    commands.spawn(Camera2dBundle::default());
+    commands.spawn(Camera2d);
 
     let skeleton = SkeletonData::new_from_json(
         asset_server.load("spineboy/export/spineboy-pro.json"),
@@ -47,7 +47,7 @@ fn setup(
 
     // Spine with no custom materials
     commands.spawn((SpineBundle {
-        skeleton: skeleton_handle.clone(),
+        skeleton: skeleton_handle.clone().into(),
         transform: Transform::from_xyz(-230., -130., 0.).with_scale(Vec3::ONE * 0.375),
         ..Default::default()
     },));
@@ -55,7 +55,7 @@ fn setup(
     // Spine with custom materials
     commands.spawn((
         SpineBundle {
-            skeleton: skeleton_handle.clone(),
+            skeleton: skeleton_handle.clone().into(),
             transform: Transform::from_xyz(230., -130., 0.).with_scale(Vec3::ONE * 0.375),
             settings: SpineSettings {
                 default_materials: false,
@@ -141,7 +141,7 @@ impl SpineMaterial for MyMaterial {
         if let Ok(spine) = params.my_spine_query.get(entity) {
             let mut material = material.unwrap_or_default();
             material.image = renderable_data.texture;
-            material.time = params.time.elapsed_seconds();
+            material.time = params.time.elapsed_secs();
             if let Some(slot) = spine
                 .skeleton
                 .slot_at_index(renderable_data.slot_index.unwrap_or(9999))
