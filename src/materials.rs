@@ -16,7 +16,7 @@ use bevy::{
             RenderPipelineDescriptor, ShaderRef, SpecializedMeshPipelineError, VertexFormat,
         },
     },
-    sprite::{Material2d, Material2dKey},
+    sprite::{AlphaMode2d, Material2d, Material2dKey},
 };
 use rusty_spine::BlendMode;
 
@@ -159,6 +159,10 @@ macro_rules! material {
 
             fn fragment_shader() -> ShaderRef {
                 SHADER_HANDLE.into()
+            }
+
+            fn alpha_mode(&self) -> AlphaMode2d {
+                AlphaMode2d::Blend
             }
 
             fn specialize(

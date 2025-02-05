@@ -53,6 +53,6 @@ fn bullet_spawn(mut commands: Commands, mut bullet_spawn_events: EventReader<Bul
 
 fn bullet_update(mut bullet_query: Query<(&mut Transform, &Bullet)>, time: Res<Time>) {
     for (mut bullet_transform, bullet) in bullet_query.iter_mut() {
-        bullet_transform.translation += (bullet.velocity * time.delta_seconds()).extend(0.);
+        bullet_transform.translation += (bullet.velocity * time.delta_secs()).extend(0.);
     }
 }

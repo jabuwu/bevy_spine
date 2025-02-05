@@ -129,6 +129,7 @@ pub struct MyMaterialParam<'w, 's> {
 }
 
 impl SpineMaterial for MyMaterial {
+    type MeshMaterial = MeshMaterial2d<Self>;
     type Material = Self;
     type Params<'w, 's> = MyMaterialParam<'w, 's>;
 
