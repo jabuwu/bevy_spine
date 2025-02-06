@@ -408,7 +408,7 @@ impl Default for SpineSettings {
 /// ) {
 ///     commands.spawn((
 ///         SpineBundle {
-///             skeleton: my_game_assets.skeleton.clone(),
+///             skeleton: SkeletonDataHandle(my_game_assets.skeleton.clone()),
 ///             ..Default::default()
 ///         },
 ///         MySpine
@@ -1134,9 +1134,6 @@ mod handle;
 
 pub mod materials;
 pub mod textures;
-
-#[cfg(test)]
-mod test;
 
 #[doc(hidden)]
 pub mod prelude {

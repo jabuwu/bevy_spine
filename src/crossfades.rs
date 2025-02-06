@@ -9,7 +9,6 @@ use rusty_spine::AnimationStateData;
 /// Apply to a [`SpineBundle`](`crate::SpineBundle`) upon creation:
 ///
 /// ```
-
 /// # use bevy::prelude::*;
 /// # use bevy_spine::prelude::*;
 /// # fn doc(mut commands: Commands) {

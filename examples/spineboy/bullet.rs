@@ -36,15 +36,14 @@ pub struct Bullet {
 fn bullet_spawn(mut commands: Commands, mut bullet_spawn_events: EventReader<BulletSpawnEvent>) {
     for event in bullet_spawn_events.read() {
         commands
-            .spawn(SpriteBundle {
-                sprite: Sprite {
+            .spawn((
+                Sprite {
                     color: Srgba::RED.into(),
                     custom_size: Some(Vec2::ONE * 16.),
                     ..Default::default()
                 },
-                transform: Transform::from_translation(event.position.extend(1.)),
-                ..Default::default()
-            })
+                Transform::from_translation(event.position.extend(1.)),
+            ))
             .insert(Bullet {
                 velocity: event.velocity,
             });

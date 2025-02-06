@@ -8,7 +8,7 @@ use bevy::{
             AsBindGroup, RenderPipelineDescriptor, ShaderRef, SpecializedMeshPipelineError,
         },
     },
-    sprite::{Material2d, Material2dKey, Material2dPlugin},
+    sprite::{AlphaMode2d, Material2d, Material2dKey, Material2dPlugin},
 };
 use bevy_spine::{
     materials::{
@@ -101,6 +101,10 @@ impl Material2d for MyMaterial {
 
     fn fragment_shader() -> ShaderRef {
         "shaders/custom.wgsl".into()
+    }
+
+    fn alpha_mode(&self) -> AlphaMode2d {
+        AlphaMode2d::Blend
     }
 
     fn specialize(

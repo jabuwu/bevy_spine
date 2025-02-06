@@ -164,10 +164,10 @@ impl SkeletonData {
     ///     mut commands: Commands,
     /// ) {
     ///     // load the skeleton (can be reused for multiple entities)
-    ///     let skeleton = skeletons.add(SkeletonData::new_from_json(
+    ///     let skeleton = SkeletonDataHandle(skeletons.add(SkeletonData::new_from_json(
     ///         asset_server.load("./skeleton.json"),
     ///         asset_server.load("./skeleton.atlas"),
-    ///     ));
+    ///     )));
     ///
     ///     // to spawn the skeleton
     ///     commands.spawn(SpineBundle {
@@ -201,10 +201,10 @@ impl SkeletonData {
     ///     mut commands: Commands,
     /// ) {
     ///     // load the skeleton (can be reused for multiple entities)
-    ///     let skeleton = skeletons.add(SkeletonData::new_from_binary(
+    ///     let skeleton = SkeletonDataHandle(skeletons.add(SkeletonData::new_from_binary(
     ///         asset_server.load("./skeleton.skel"),
     ///         asset_server.load("./skeleton.atlas"),
-    ///     ));
+    ///     )));
     ///
     ///     // to spawn the skeleton
     ///     commands.spawn(SpineBundle {

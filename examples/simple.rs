@@ -25,7 +25,7 @@ fn setup(
     let skeleton_handle = skeletons.add(skeleton);
 
     commands.spawn(SpineBundle {
-        skeleton: skeleton_handle.clone().into(),
+        skeleton: skeleton_handle.into(),
         transform: Transform::from_xyz(0., -200., 0.),
         ..Default::default()
     });

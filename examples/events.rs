@@ -53,11 +53,7 @@ fn on_spawn(
     }
 }
 
-fn on_spine_event(
-    mut spine_events: EventReader<SpineEvent>,
-    mut commands: Commands,
-    asset_server: Res<AssetServer>,
-) {
+fn on_spine_event(mut spine_events: EventReader<SpineEvent>, mut commands: Commands) {
     for event in spine_events.read() {
         if let SpineEvent::Event { name, .. } = event {
             commands
