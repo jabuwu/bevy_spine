@@ -1026,11 +1026,19 @@ fn spine_update_meshes(
 }
 
 fn empty_mesh(mesh: &mut Mesh) {
-    let positions: Vec<[f32; 3]> = vec![];
-    let normals: Vec<[f32; 3]> = vec![];
-    let uvs: Vec<[f32; 2]> = vec![];
-    let colors: Vec<[f32; 4]> = vec![];
-    let dark_colors: Vec<[f32; 4]> = vec![];
+    let positions: Vec<[f32; 3]> = vec![[0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0]];
+    let normals: Vec<[f32; 3]> = vec![[0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0]];
+    let uvs: Vec<[f32; 2]> = vec![[0.0, 0.0], [0.0, 0.0], [0.0, 0.0]];
+    let colors: Vec<[f32; 4]> = vec![
+        [0.0, 0.0, 0.0, 0.0],
+        [0.0, 0.0, 0.0, 0.0],
+        [0.0, 0.0, 0.0, 0.0],
+    ];
+    let dark_colors: Vec<[f32; 4]> = vec![
+        [0.0, 0.0, 0.0, 0.0],
+        [0.0, 0.0, 0.0, 0.0],
+        [0.0, 0.0, 0.0, 0.0],
+    ];
 
     mesh.remove_indices();
     mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, positions);
