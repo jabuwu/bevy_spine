@@ -11,7 +11,7 @@ exclude = ["assets/*"]
 
 [dependencies]
 rusty_spine = "0.8"
-bevy = { version = "0.15", default-features = false, features = [
+bevy = { version = "^0.15.2", default-features = false, features = [
     "bevy_render",
     "bevy_asset",
     "bevy_sprite",
