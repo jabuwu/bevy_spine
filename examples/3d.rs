@@ -4,6 +4,7 @@ use bevy::{
     prelude::*,
     window::{CursorGrabMode, PrimaryWindow},
 };
+use bevy::window::CursorOptions;
 use bevy_spine::{
     materials::{SpineMaterial, SpineMaterialInfo, SpineMaterialPlugin, SpineSettingsQuery},
     prelude::*,
@@ -45,29 +46,25 @@ fn setup(
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
     // plane
-    commands.spawn(PbrBundle {
-        mesh: meshes.add(Plane3d::default().mesh().size(5.0, 5.0)),
-        material: materials.add(Color::srgb(0.3, 0.5, 0.3)),
-        ..default()
-    });
+    commands.spawn((
+        Mesh3d(meshes.add(Plane3d::default().mesh().size(5.0, 5.0))),
+        MeshMaterial3d(materials.add(Color::srgb(0.3, 0.5, 0.3))),
+    ));
 
     // light
-    commands.spawn(PointLightBundle {
-        point_light: PointLight {
+    commands.spawn((
+        PointLight {
             intensity: 1500.0,
             shadows_enabled: true,
             ..default()
         },
-        transform: Transform::from_xyz(4.0, 8.0, 4.0),
-        ..default()
-    });
+        Transform::from_xyz(4.0, 8.0, 4.0),
+    ));
 
     // camera
     commands.spawn((
-        Camera3dBundle {
-            transform: Transform::from_xyz(-2.0, 2.5, 5.0).looking_at(Vec3::ZERO, Vec3::Y),
-            ..default()
-        },
+        Camera3d::default(),
+        Transform::from_xyz(-2.0, 2.5, 5.0).looking_at(Vec3::ZERO, Vec3::Y),
         Orbit::default(),
     ));
 
@@ -78,7 +75,7 @@ fn setup(
     );
     let skeleton_handle = skeletons.add(skeleton);
     commands.spawn(SpineBundle {
-        skeleton: skeleton_handle.clone(),
+        skeleton: skeleton_handle.clone().into(),
         transform: Transform::from_xyz(0., 0., 0.).with_scale(Vec3::ONE * 0.005),
         settings: SpineSettings {
             default_materials: false,
@@ -90,7 +87,7 @@ fn setup(
 }
 
 fn on_spawn(
-    mut spine_ready_event: EventReader<SpineReadyEvent>,
+    mut spine_ready_event: MessageReader<SpineReadyEvent>,
     mut spine_query: Query<&mut Spine>,
 ) {
     for event in spine_ready_event.read() {
@@ -104,25 +101,25 @@ fn on_spawn(
 }
 
 fn controls(
-    mut window_query: Query<&mut Window, With<PrimaryWindow>>,
-    mut mouse_motion_events: EventReader<MouseMotion>,
+    window_query: Single<&mut CursorOptions, With<PrimaryWindow>>,
+    mut mouse_motion_events: MessageReader<MouseMotion>,
     mut orbit_query: Query<(&mut Orbit, &mut Transform)>,
     mouse_buttons: Res<ButtonInput<MouseButton>>,
     keys: Res<ButtonInput<KeyCode>>,
 ) {
-    let mut window = window_query.single_mut();
+    let mut cursor_options = window_query.into_inner();
     if mouse_buttons.just_pressed(MouseButton::Left) {
-        window.cursor.grab_mode = CursorGrabMode::Locked;
-        window.cursor.visible = false;
+        cursor_options.grab_mode = CursorGrabMode::Locked;
+        cursor_options.visible = false;
     }
     if keys.just_pressed(KeyCode::Escape) {
-        window.cursor.grab_mode = CursorGrabMode::None;
-        window.cursor.visible = true;
+        cursor_options.grab_mode = CursorGrabMode::None;
+        cursor_options.visible = true;
     }
 
     let mut mouse_movement = Vec2::ZERO;
     for mouse_motion_event in mouse_motion_events.read() {
-        if window.cursor.grab_mode == CursorGrabMode::Locked {
+        if cursor_options.grab_mode == CursorGrabMode::Locked {
             mouse_movement += mouse_motion_event.delta;
         }
     }
@@ -139,6 +136,7 @@ fn controls(
 pub struct Spine3DMaterial;
 
 impl SpineMaterial for Spine3DMaterial {
+    type MeshMaterial = MeshMaterial3d<StandardMaterial>;
     type Material = StandardMaterial;
     type Params<'w, 's> = SpineSettingsQuery<'w, 's>;
 

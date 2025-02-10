@@ -1,7 +1,7 @@
 use std::{path::Path, sync::Arc};
 
 use bevy::{
-    asset::{io::Reader, AssetLoader, AsyncReadExt, LoadContext},
+    asset::{io::Reader, AssetLoader, LoadContext},
     prelude::*,
     reflect::TypePath,
 };
@@ -32,11 +32,11 @@ impl AssetLoader for AtlasLoader {
     type Settings = ();
     type Error = SpineLoaderError;
 
-    async fn load<'a>(
-        &'a self,
-        reader: &'a mut Reader<'_>,
-        _settings: &'a Self::Settings,
-        load_context: &'a mut LoadContext<'_>,
+    async fn load(
+        &self,
+        reader: &mut dyn Reader,
+        _settings: &Self::Settings,
+        load_context: &mut LoadContext<'_>,
     ) -> Result<Self::Asset, Self::Error> {
         let mut bytes = Vec::new();
         reader.read_to_end(&mut bytes).await?;
@@ -72,11 +72,11 @@ impl AssetLoader for SkeletonJsonLoader {
     type Settings = ();
     type Error = SpineLoaderError;
 
-    async fn load<'a>(
-        &'a self,
-        reader: &'a mut Reader<'_>,
-        _settings: &'a Self::Settings,
-        _load_context: &'a mut LoadContext<'_>,
+    async fn load(
+        &self,
+        reader: &mut dyn Reader,
+        _settings: &Self::Settings,
+        _load_context: &mut LoadContext<'_>,
     ) -> Result<Self::Asset, Self::Error> {
         let mut bytes = Vec::new();
         reader.read_to_end(&mut bytes).await?;
@@ -106,11 +106,11 @@ impl AssetLoader for SkeletonBinaryLoader {
     type Settings = ();
     type Error = SpineLoaderError;
 
-    async fn load<'a>(
-        &'a self,
-        reader: &'a mut Reader<'_>,
-        _settings: &'a Self::Settings,
-        _load_context: &'a mut LoadContext<'_>,
+    async fn load(
+        &self,
+        reader: &mut dyn Reader,
+        _settings: &Self::Settings,
+        _load_context: &mut LoadContext<'_>,
     ) -> Result<Self::Asset, Self::Error> {
         let mut bytes = Vec::new();
         reader.read_to_end(&mut bytes).await?;
@@ -164,10 +164,10 @@ impl SkeletonData {
     ///     mut commands: Commands,
     /// ) {
     ///     // load the skeleton (can be reused for multiple entities)
-    ///     let skeleton = skeletons.add(SkeletonData::new_from_json(
+    ///     let skeleton = SkeletonDataHandle(skeletons.add(SkeletonData::new_from_json(
     ///         asset_server.load("./skeleton.json"),
     ///         asset_server.load("./skeleton.atlas"),
-    ///     ));
+    ///     )));
     ///
     ///     // to spawn the skeleton
     ///     commands.spawn(SpineBundle {
@@ -201,10 +201,10 @@ impl SkeletonData {
     ///     mut commands: Commands,
     /// ) {
     ///     // load the skeleton (can be reused for multiple entities)
-    ///     let skeleton = skeletons.add(SkeletonData::new_from_binary(
+    ///     let skeleton = SkeletonDataHandle(skeletons.add(SkeletonData::new_from_binary(
     ///         asset_server.load("./skeleton.skel"),
     ///         asset_server.load("./skeleton.atlas"),
-    ///     ));
+    ///     )));
     ///
     ///     // to spawn the skeleton
     ///     commands.spawn(SpineBundle {

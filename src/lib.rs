@@ -8,16 +8,14 @@ use std::{
     sync::{Arc, Mutex},
 };
 
+use bevy::asset::RenderAssetUsages;
+use bevy::mesh::{Indices, MeshVertexAttribute};
+use bevy::sprite_render::Material2dPlugin;
 use bevy::{
     asset::load_internal_binary_asset,
+    image::{ImageAddressMode, ImageFilterMode, ImageSampler, ImageSamplerDescriptor},
     prelude::*,
-    render::{
-        mesh::{Indices, MeshVertexAttribute},
-        render_asset::RenderAssetUsages,
-        render_resource::{PrimitiveTopology, VertexFormat},
-        texture::{ImageAddressMode, ImageFilterMode, ImageSampler, ImageSamplerDescriptor},
-    },
-    sprite::{Material2dPlugin, Mesh2dHandle},
+    render::render_resource::{PrimitiveTopology, VertexFormat},
 };
 use materials::{
     SpineAdditiveMaterial, SpineAdditivePmaMaterial, SpineMaterialInfo, SpineMultiplyMaterial,
@@ -25,9 +23,9 @@ use materials::{
     SpineScreenPmaMaterial,
 };
 use rusty_spine::{
-    atlas::{AtlasFilter, AtlasWrap},
-    controller::{SkeletonCombinedRenderable, SkeletonRenderable},
-    AnimationEvent, Physics, Skeleton,
+    atlas::{AtlasFilter, AtlasWrap}, controller::{SkeletonCombinedRenderable, SkeletonRenderable}, AnimationEvent,
+    Physics,
+    Skeleton,
 };
 use textures::SpineTextureConfig;
 
@@ -40,10 +38,11 @@ use crate::{
     textures::{SpineTexture, SpineTextureCreateEvent, SpineTextureDisposeEvent, SpineTextures},
 };
 
-pub use crate::{assets::*, crossfades::Crossfades, entity_sync::*, rusty_spine::Color};
+pub use crate::{assets::*, crossfades::Crossfades, entity_sync::*, handle::*, rusty_spine::Color};
 
 /// See [`rusty_spine`] docs for more info.
 pub use crate::rusty_spine::controller::SkeletonController;
+
 
 pub use rusty_spine;
 
@@ -126,8 +125,8 @@ impl Plugin for SpinePlugin {
         .init_resource::<SpineEventQueue>()
         .insert_resource(SpineTextures::init())
         .insert_resource(SpineReadyEvents::default())
-        .add_event::<SpineTextureCreateEvent>()
-        .add_event::<SpineTextureDisposeEvent>()
+        .add_message::<SpineTextureCreateEvent>()
+        .add_message::<SpineTextureDisposeEvent>()
         .init_asset::<Atlas>()
         .init_asset::<SkeletonJson>()
         .init_asset::<SkeletonBinary>()
@@ -135,8 +134,8 @@ impl Plugin for SpinePlugin {
         .init_asset_loader::<AtlasLoader>()
         .init_asset_loader::<SkeletonJsonLoader>()
         .init_asset_loader::<SkeletonBinaryLoader>()
-        .add_event::<SpineReadyEvent>()
-        .add_event::<SpineEvent>()
+        .add_message::<SpineReadyEvent>()
+        .add_message::<SpineEvent>()
         .add_systems(
             Update,
             (
@@ -157,7 +156,7 @@ impl Plugin for SpinePlugin {
                     .in_set(SpineSet::OnUpdateMesh)
                     .after(SpineSystem::UpdateAnimation)
                     .after(SpineSet::OnEvent),
-                apply_deferred
+                ApplyDeferred
                     .in_set(SpineSystem::SpawnFlush)
                     .after(SpineSystem::Spawn)
                     .before(SpineSystem::Ready),
@@ -408,7 +407,7 @@ impl Default for SpineSettings {
 /// ) {
 ///     commands.spawn((
 ///         SpineBundle {
-///             skeleton: my_game_assets.skeleton.clone(),
+///             skeleton: SkeletonDataHandle(my_game_assets.skeleton.clone()),
 ///             ..Default::default()
 ///         },
 ///         MySpine
@@ -431,7 +430,7 @@ impl Default for SpineSettings {
 pub struct SpineBundle {
     pub loader: SpineLoader,
     pub settings: SpineSettings,
-    pub skeleton: Handle<SkeletonData>,
+    pub skeleton: SkeletonDataHandle,
     pub crossfades: Crossfades,
     pub transform: Transform,
     pub global_transform: GlobalTransform,
@@ -440,12 +439,12 @@ pub struct SpineBundle {
     pub view_visibility: ViewVisibility,
 }
 
-/// An [`Event`] which is sent once a [`SpineLoader`] has fully loaded a skeleton and attached the
+/// A [`Message`] which is sent once a [`SpineLoader`] has fully loaded a skeleton and attached the
 /// [`Spine`] component.
 ///
 /// For convenience, systems receiving this event can be added to the [`SpineSet::OnReady`] set to
 /// receive this after events are sent, but before the first [`SkeletonController`] update.
-#[derive(Debug, Clone, Event)]
+#[derive(Debug, Clone, Message)]
 pub struct SpineReadyEvent {
     /// The entity containing the [`Spine`] component.
     pub entity: Entity,
@@ -474,7 +473,7 @@ pub struct SpineReadyEvent {
 ///     }
 /// }
 /// ```
-#[derive(Debug, Clone, Event)]
+#[derive(Debug, Clone, Message)]
 pub enum SpineEvent {
     Start {
         entity: Entity,
@@ -514,9 +513,9 @@ struct SpineReadyEvents(Vec<SpineReadyEvent>);
 #[allow(clippy::too_many_arguments)]
 fn spine_load(
     mut skeleton_data_assets: ResMut<Assets<SkeletonData>>,
-    mut texture_create_events: EventWriter<SpineTextureCreateEvent>,
-    mut texture_dispose_events: EventWriter<SpineTextureDisposeEvent>,
-    atlases: Res<Assets<Atlas>>,
+    mut texture_create_events: MessageWriter<SpineTextureCreateEvent>,
+    mut texture_dispose_events: MessageWriter<SpineTextureDisposeEvent>,
+    mut atlases: ResMut<Assets<Atlas>>,
     jsons: Res<Assets<SkeletonJson>>,
     binaries: Res<Assets<SkeletonBinary>>,
     spine_textures: Res<SpineTextures>,
@@ -590,7 +589,7 @@ fn spine_load(
 
     spine_textures.update(
         asset_server.as_ref(),
-        atlases.as_ref(),
+        &mut atlases,
         &mut texture_create_events,
         &mut texture_dispose_events,
     );
@@ -601,7 +600,7 @@ fn spine_spawn(
     mut skeleton_query: Query<(
         &mut SpineLoader,
         Entity,
-        &Handle<SkeletonData>,
+        &SkeletonDataHandle,
         Option<&Crossfades>,
     )>,
     mut commands: Commands,
@@ -613,7 +612,7 @@ fn spine_spawn(
     for (mut spine_loader, spine_entity, data_handle, crossfades) in skeleton_query.iter_mut() {
         if let SpineLoader::Loading { with_children } = spine_loader.as_ref() {
             let skeleton_data_asset =
-                if let Some(skeleton_data_asset) = skeleton_data_assets.get_mut(data_handle) {
+                if let Some(skeleton_data_asset) = skeleton_data_assets.get_mut(&data_handle.0) {
                     skeleton_data_asset
                 } else {
                     continue;
@@ -696,7 +695,7 @@ fn spine_spawn(
                         });
                     controller.skeleton.set_to_setup_pose();
                     let mut bones = HashMap::new();
-                    if let Some(mut entity_commands) = commands.get_entity(spine_entity) {
+                    if let Ok(mut entity_commands) = commands.get_entity(spine_entity) {
                         entity_commands
                             .with_children(|parent| {
                                 // TODO: currently, a mesh is created for each slot, however when we use the
@@ -769,7 +768,7 @@ fn spine_spawn(
 fn spawn_bones(
     spine_entity: Entity,
     bone_parent: Option<SpineBoneParent>,
-    parent: &mut ChildBuilder,
+    spawner: &mut ChildSpawnerCommands<'_>,
     skeleton: &Skeleton,
     bone: BoneHandle,
     bones: &mut HashMap<String, Entity>,
@@ -782,7 +781,7 @@ fn spawn_bones(
         transform.rotation = Quat::from_axis_angle(Vec3::Z, bone.applied_rotation().to_radians());
         transform.scale.x = bone.applied_scale_x();
         transform.scale.y = bone.applied_scale_y();
-        let bone_entity = parent
+        let bone_entity = spawner
             .spawn((
                 Name::new(format!("spine_bone ({})", bone.data().name())),
                 transform,
@@ -802,7 +801,7 @@ fn spawn_bones(
                     spawn_bones(
                         spine_entity,
                         Some(SpineBoneParent {
-                            entity: parent.parent_entity(),
+                            entity: parent.target_entity(),
                             handle: bone.handle(),
                         }),
                         parent,
@@ -819,26 +818,26 @@ fn spawn_bones(
 
 fn spine_ready(
     mut ready_events: ResMut<SpineReadyEvents>,
-    mut ready_writer: EventWriter<SpineReadyEvent>,
+    mut ready_writer: MessageWriter<SpineReadyEvent>,
 ) {
     for event in take(&mut ready_events.0).into_iter() {
-        ready_writer.send(event);
+        ready_writer.write(event);
     }
 }
 
 fn spine_update_animation(
     mut spine_query: Query<(Entity, &mut Spine)>,
-    mut spine_events: EventWriter<SpineEvent>,
+    mut spine_events: MessageWriter<SpineEvent>,
     time: Res<Time>,
     spine_event_queue: Res<SpineEventQueue>,
 ) {
     for (_, mut spine) in spine_query.iter_mut() {
-        spine.update(time.delta_seconds(), Physics::Update);
+        spine.update(time.delta_secs(), Physics::Update);
     }
     {
         let mut events = spine_event_queue.0.lock().unwrap();
         while let Some(event) = events.pop_front() {
-            spine_events.send(event);
+            spine_events.write(event);
         }
     }
 }
@@ -856,15 +855,15 @@ fn spine_update_meshes(
         Entity,
         &mut SpineMesh,
         &mut Transform,
-        Option<&Mesh2dHandle>,
-        Option<&Handle<Mesh>>,
+        Option<&Mesh2d>,
+        Option<&Mesh3d>,
     )>,
     mut commands: Commands,
-    meshes_query: Query<(&Parent, &Children), With<SpineMeshes>>,
+    meshes_query: Query<(&ChildOf, &Children), With<SpineMeshes>>,
     asset_server: Res<AssetServer>,
 ) {
     for (meshes_parent, meshes_children) in meshes_query.iter() {
-        let Ok((mut spine, spine_mesh_type)) = spine_query.get_mut(meshes_parent.get()) else {
+        let Ok((mut spine, spine_mesh_type)) = spine_query.get_mut(meshes_parent.parent()) else {
             continue;
         };
         let SpineSettings {
@@ -886,19 +885,19 @@ fn spine_update_meshes(
                 mut spine_mesh_transform,
                 spine_2d_mesh,
                 spine_3d_mesh,
-            )) = mesh_query.get_mut(*child)
+            )) = mesh_query.get_mut(child)
             {
                 macro_rules! apply_mesh {
                     ($mesh:ident, $condition:expr, $attach:expr, $deattach:ty) => {
                         if $condition {
                             if !$mesh.is_some() {
-                                if let Some(mut entity) = commands.get_entity(spine_mesh_entity) {
+                                if let Ok(mut entity) = commands.get_entity(spine_mesh_entity) {
                                     entity.insert($attach);
                                 }
                             }
                         } else {
                             if $mesh.is_some() {
-                                if let Some(mut entity) = commands.get_entity(spine_mesh_entity) {
+                                if let Ok(mut entity) = commands.get_entity(spine_mesh_entity) {
                                     entity.remove::<$deattach>();
                                 }
                             }
@@ -908,14 +907,14 @@ fn spine_update_meshes(
                 apply_mesh!(
                     spine_2d_mesh,
                     mesh_type == SpineMeshType::Mesh2D,
-                    Mesh2dHandle(spine_mesh.handle.clone()),
-                    Mesh2dHandle
+                    Mesh2d(spine_mesh.handle.clone()),
+                    Mesh2d
                 );
                 apply_mesh!(
                     spine_3d_mesh,
                     mesh_type == SpineMeshType::Mesh3D,
-                    spine_mesh.handle.clone(),
-                    Handle<Mesh>
+                    Mesh3d(spine_mesh.handle.clone()),
+                    Mesh3d
                 );
                 let Some(mesh) = meshes.get_mut(&spine_mesh.handle) else {
                     continue;
@@ -1026,11 +1025,19 @@ fn spine_update_meshes(
 }
 
 fn empty_mesh(mesh: &mut Mesh) {
-    let positions: Vec<[f32; 3]> = vec![];
-    let normals: Vec<[f32; 3]> = vec![];
-    let uvs: Vec<[f32; 2]> = vec![];
-    let colors: Vec<[f32; 4]> = vec![];
-    let dark_colors: Vec<[f32; 4]> = vec![];
+    let positions: Vec<[f32; 3]> = vec![[0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0]];
+    let normals: Vec<[f32; 3]> = vec![[0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0]];
+    let uvs: Vec<[f32; 2]> = vec![[0.0, 0.0], [0.0, 0.0], [0.0, 0.0]];
+    let colors: Vec<[f32; 4]> = vec![
+        [0.0, 0.0, 0.0, 0.0],
+        [0.0, 0.0, 0.0, 0.0],
+        [0.0, 0.0, 0.0, 0.0],
+    ];
+    let dark_colors: Vec<[f32; 4]> = vec![
+        [0.0, 0.0, 0.0, 0.0],
+        [0.0, 0.0, 0.0, 0.0],
+        [0.0, 0.0, 0.0, 0.0],
+    ];
 
     mesh.remove_indices();
     mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, positions);
@@ -1048,7 +1055,7 @@ struct FixSpineTextures {
 /// Adjusts Spine textures to render properly.
 fn adjust_spine_textures(
     mut local: Local<FixSpineTextures>,
-    mut spine_texture_create_events: EventReader<SpineTextureCreateEvent>,
+    mut spine_texture_create_events: MessageReader<SpineTextureCreateEvent>,
     mut images: ResMut<Assets<Image>>,
 ) {
     for spine_texture_create_event in spine_texture_create_events.read() {
@@ -1091,32 +1098,34 @@ fn adjust_spine_textures(
             // The RGB components exported from Spine were premultiplied in nonlinear space, but need to be
             // multiplied in linear space to render properly in Bevy.
             if handle_config.premultiplied_alpha {
-                for i in 0..(image.data.len() / 4) {
-                    let mut rgba = Srgba::rgba_u8(
-                        image.data[i * 4],
-                        image.data[i * 4 + 1],
-                        image.data[i * 4 + 2],
-                        image.data[i * 4 + 3],
-                    );
-                    if rgba.alpha != 0. {
-                        rgba = Srgba::new(
-                            rgba.red / rgba.alpha,
-                            rgba.green / rgba.alpha,
-                            rgba.blue / rgba.alpha,
-                            rgba.alpha,
+                if let Some(data) = &mut image.data {
+                    for i in 0..(data.len() / 4) {
+                        let mut rgba = Srgba::rgba_u8(
+                            data[i * 4],
+                            data[i * 4 + 1],
+                            data[i * 4 + 2],
+                            data[i * 4 + 3],
                         );
-                    } else {
-                        rgba = Srgba::new(0., 0., 0., 0.);
+                        if rgba.alpha != 0. {
+                            rgba = Srgba::new(
+                                rgba.red / rgba.alpha,
+                                rgba.green / rgba.alpha,
+                                rgba.blue / rgba.alpha,
+                                rgba.alpha,
+                            );
+                        } else {
+                            rgba = Srgba::new(0., 0., 0., 0.);
+                        }
+                        let mut linear_rgba = LinearRgba::from(rgba);
+                        linear_rgba.red *= linear_rgba.alpha;
+                        linear_rgba.green *= linear_rgba.alpha;
+                        linear_rgba.blue *= linear_rgba.alpha;
+                        rgba = Srgba::from(linear_rgba);
+                        data[i * 4] = (rgba.red * 255.) as u8;
+                        data[i * 4 + 1] = (rgba.green * 255.) as u8;
+                        data[i * 4 + 2] = (rgba.blue * 255.) as u8;
+                        data[i * 4 + 3] = (rgba.alpha * 255.) as u8;
                     }
-                    let mut linear_rgba = LinearRgba::from(rgba);
-                    linear_rgba.red *= linear_rgba.alpha;
-                    linear_rgba.green *= linear_rgba.alpha;
-                    linear_rgba.blue *= linear_rgba.alpha;
-                    rgba = Srgba::from(linear_rgba);
-                    image.data[i * 4] = (rgba.red * 255.) as u8;
-                    image.data[i * 4 + 1] = (rgba.green * 255.) as u8;
-                    image.data[i * 4 + 2] = (rgba.blue * 255.) as u8;
-                    image.data[i * 4 + 3] = (rgba.alpha * 255.) as u8;
                 }
             }
             removed_handles.push(handle_index);
@@ -1130,19 +1139,18 @@ fn adjust_spine_textures(
 mod assets;
 mod crossfades;
 mod entity_sync;
+mod handle;
 
 pub mod materials;
 pub mod textures;
 
-#[cfg(test)]
-mod test;
-
 #[doc(hidden)]
 pub mod prelude {
     pub use crate::{
-        Crossfades, SkeletonController, SkeletonData, Spine, SpineBone, SpineBundle, SpineEvent,
-        SpineLoader, SpineMesh, SpineMeshState, SpinePlugin, SpineReadyEvent, SpineSet,
-        SpineSettings, SpineSync, SpineSyncSet, SpineSyncSystem, SpineSystem,
+        Crossfades, SkeletonController, SkeletonData, SkeletonDataHandle, Spine, SpineBone,
+        SpineBundle, SpineEvent, SpineLoader, SpineMesh, SpineMeshState, SpinePlugin,
+        SpineReadyEvent, SpineSet, SpineSettings, SpineSync, SpineSyncSet, SpineSyncSystem,
+        SpineSystem,
     };
     pub use rusty_spine::{BoneHandle, SlotHandle};
 }

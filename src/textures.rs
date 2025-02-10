@@ -34,7 +34,7 @@ pub(crate) struct SpineTextures {
 /// An [`Event`] fired for each texture loaded by Spine.
 ///
 /// Sent in [`SpineSystem::Load`](`crate::SpineSystem::Load`).
-#[derive(Debug, Clone, Event)]
+#[derive(Debug, Clone, Message)]
 pub struct SpineTextureCreateEvent {
     pub path: String,
     pub handle: Handle<Image>,
@@ -45,7 +45,7 @@ pub struct SpineTextureCreateEvent {
 /// An [`Event`] fired for each texture disposed, after [`SpineTextureCreateEvent`].
 ///
 /// Sent in [`SpineSystem::Load`](`crate::SpineSystem::Load`).
-#[derive(Debug, Clone, Event)]
+#[derive(Debug, Clone, Message)]
 pub struct SpineTextureDisposeEvent {
     pub path: String,
     pub handle: Handle<Image>,
@@ -95,9 +95,9 @@ impl SpineTextures {
     pub fn update(
         &self,
         asset_server: &AssetServer,
-        atlases: &Assets<Atlas>,
-        create_events: &mut EventWriter<SpineTextureCreateEvent>,
-        dispose_events: &mut EventWriter<SpineTextureDisposeEvent>,
+        atlases: &mut Assets<Atlas>,
+        create_events: &mut MessageWriter<SpineTextureCreateEvent>,
+        dispose_events: &mut MessageWriter<SpineTextureDisposeEvent>,
     ) {
         let mut data = self.data.lock().unwrap();
         while let Some(texture) = data.remember.pop() {
@@ -105,7 +105,7 @@ impl SpineTextures {
             // if none, the atlas was already deleted before getting here
             if let Some(atlas) = find_matching_atlas(atlases, texture.atlas_address) {
                 data.handles.push((texture.path.clone(), handle.clone()));
-                create_events.send(SpineTextureCreateEvent {
+                create_events.write(SpineTextureCreateEvent {
                     path: texture.path,
                     atlas,
                     handle,
@@ -115,7 +115,7 @@ impl SpineTextures {
         }
         while let Some(texture_path) = data.forget.pop() {
             if let Some(index) = data.handles.iter().position(|i| i.0 == texture_path) {
-                dispose_events.send(SpineTextureDisposeEvent {
+                dispose_events.write(SpineTextureDisposeEvent {
                     path: texture_path,
                     handle: data.handles[index].1.clone(),
                 });
@@ -125,11 +125,9 @@ impl SpineTextures {
     }
 }
 
-fn find_matching_atlas(atlases: &Assets<Atlas>, atlas_address: usize) -> Option<Handle<Atlas>> {
-    for (atlas_handle, atlas) in atlases.iter() {
-        if atlas.atlas.c_ptr() as usize == atlas_address {
-            return Some(Handle::Weak(atlas_handle));
-        }
-    }
-    None
+fn find_matching_atlas(atlases: &mut Assets<Atlas>, atlas_address: usize) -> Option<Handle<Atlas>> {
+    let id = atlases
+        .iter()
+        .find_map(|(id, atlas)| (atlas.atlas.c_ptr() as usize == atlas_address).then_some(id))?;
+    atlases.get_strong_handle(id)
 }

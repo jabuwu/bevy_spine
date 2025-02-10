@@ -25,7 +25,7 @@ pub struct PlayerPlugin;
 
 impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
-        app.add_event::<PlayerSpawnEvent>().add_systems(
+        app.add_message::<PlayerSpawnEvent>().add_systems(
             Update,
             (
                 player_spawn.in_set(PlayerSystem::Spawn),
@@ -51,7 +51,7 @@ impl Plugin for PlayerPlugin {
     }
 }
 
-#[derive(Event)]
+#[derive(Message)]
 pub struct PlayerSpawnEvent {
     pub skeleton: Handle<SkeletonData>,
 }
@@ -74,11 +74,11 @@ pub struct ShootController {
     bone: Entity,
 }
 
-fn player_spawn(mut commands: Commands, mut player_spawn_events: EventReader<PlayerSpawnEvent>) {
+fn player_spawn(mut commands: Commands, mut player_spawn_events: MessageReader<PlayerSpawnEvent>) {
     for event in player_spawn_events.read() {
         commands
             .spawn(SpineBundle {
-                skeleton: event.skeleton.clone(),
+                skeleton: event.skeleton.clone().into(),
                 transform: Transform::from_xyz(-300., -200., 0.).with_scale(Vec3::ONE * 0.25),
                 ..Default::default()
             })
@@ -91,7 +91,7 @@ fn player_spawn(mut commands: Commands, mut player_spawn_events: EventReader<Pla
 }
 
 fn player_spine_ready(
-    mut spine_ready_events: EventReader<SpineReadyEvent>,
+    mut spine_ready_events: MessageReader<SpineReadyEvent>,
     mut spine_query: Query<(&mut Spine, Entity), With<Player>>,
     mut spine_bone_query: Query<(&mut SpineBone, Entity)>,
     mut commands: Commands,
@@ -124,7 +124,7 @@ fn player_spine_ready(
 }
 
 fn player_spine_events(
-    mut spine_events: EventReader<SpineEvent>,
+    mut spine_events: MessageReader<SpineEvent>,
     mut spine_query: Query<(&mut Spine, &mut Player)>,
 ) {
     for event in spine_events.read() {
@@ -168,30 +168,32 @@ fn player_spine_events(
 
 fn player_aim(
     mut crosshair_query: Query<(&mut Spine, Entity, &CrosshairController, &Player)>,
-    bone_query: Query<(Entity, &Parent), With<SpineBone>>,
+    bone_query: Query<(Entity, &ChildOf), With<SpineBone>>,
     mut transform_query: Query<&mut Transform>,
     global_transform_query: Query<&GlobalTransform>,
-    window_query: Query<&Window>,
-    camera_query: Query<(Entity, &Camera)>,
+    window_query: Single<&Window>,
+    camera_query: Single<(Entity, &Camera)>,
     time: Res<Time>,
 ) {
-    let (camera_entity, camera) = camera_query.single();
+    let (camera_entity, camera) = camera_query.into_inner();
     let camera_global_transform = global_transform_query.get(camera_entity).unwrap();
-    let Ok(window) = window_query.get_single() else {
-        return;
-    };
+    let window = window_query.into_inner();
     let cursor_position = window
         .cursor_position()
-        .and_then(|cursor| camera.viewport_to_world(camera_global_transform, cursor))
+        .and_then(|cursor| {
+            camera
+                .viewport_to_world(camera_global_transform, cursor)
+                .ok()
+        })
         .map(|ray| ray.origin.truncate())
         .unwrap_or(Vec2::ZERO);
     for (mut spine, player_entity, crosshair, player) in crosshair_query.iter_mut() {
         if player.spawned {
             if let Ok((crosshair_entity, crosshair_parent)) = bone_query.get(crosshair.bone) {
                 let matrix = if let Ok(parent_transform) =
-                    global_transform_query.get(crosshair_parent.get())
+                    global_transform_query.get(crosshair_parent.parent())
                 {
-                    parent_transform.compute_matrix().inverse()
+                    parent_transform.to_matrix().inverse()
                 } else {
                     Mat4::IDENTITY
                 };
@@ -211,7 +213,7 @@ fn player_aim(
                 {
                     let alpha = aim_track.alpha() * 2.5;
                     aim_track
-                        .set_alpha(lerp::Lerp::lerp(alpha, 1., time.delta_seconds()).clamp(0., 1.));
+                        .set_alpha(lerp::Lerp::lerp(alpha, 1., time.delta_secs()).clamp(0., 1.));
                 }
             }
         }
@@ -221,13 +223,13 @@ fn player_aim(
 fn player_shoot(
     mut shoot_query: Query<(&mut ShootController, &Player)>,
     mut spine_query: Query<(&mut Spine, &Transform)>,
-    mut bullet_spawn_events: EventWriter<BulletSpawnEvent>,
+    mut bullet_spawn_events: MessageWriter<BulletSpawnEvent>,
     global_transform_query: Query<&GlobalTransform>,
     mouse_buttons: Res<ButtonInput<MouseButton>>,
     time: Res<Time>,
 ) {
     for (mut shoot, player) in shoot_query.iter_mut() {
-        shoot.cooldown = (shoot.cooldown - time.delta_seconds()).max(0.);
+        shoot.cooldown = (shoot.cooldown - time.delta_secs()).max(0.);
         if mouse_buttons.just_pressed(MouseButton::Left) && player.spawned && shoot.cooldown == 0. {
             let mut scale_x = 1.;
             if let Ok((mut spine, spine_transform)) = spine_query.get_mut(shoot.spine) {
@@ -239,7 +241,7 @@ fn player_shoot(
             }
             if let Ok(shoot_transform) = global_transform_query.get(shoot.bone) {
                 let (_, rotation, translation) = shoot_transform.to_scale_rotation_translation();
-                bullet_spawn_events.send(BulletSpawnEvent {
+                bullet_spawn_events.write(BulletSpawnEvent {
                     position: translation.truncate(),
                     velocity: (rotation * Vec3::X).truncate() * 1000. * scale_x.signum(),
                 });
@@ -264,12 +266,11 @@ fn player_move(
                 movement += 1.;
             }
             player.movement_velocity =
-                (player.movement_velocity + movement * 20. * time.delta_seconds()).clamp(-1., 1.);
+                (player.movement_velocity + movement * 20. * time.delta_secs()).clamp(-1., 1.);
             if movement == 0. {
-                player.movement_velocity *= 0.0001_f32.powf(time.delta_seconds());
+                player.movement_velocity *= 0.0001_f32.powf(time.delta_secs());
             }
-            player_transform.translation.x +=
-                player.movement_velocity * time.delta_seconds() * 500.;
+            player_transform.translation.x += player.movement_velocity * time.delta_secs() * 500.;
             player_transform.translation.x = player_transform.translation.x.clamp(-500., 500.);
             if let Some(mut track) = player_spine
                 .animation_state

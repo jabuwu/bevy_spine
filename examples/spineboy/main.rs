@@ -13,17 +13,17 @@ fn main() {
 fn setup(
     mut commands: Commands,
     mut skeletons: ResMut<Assets<SkeletonData>>,
-    mut player_spawn_events: EventWriter<PlayerSpawnEvent>,
+    mut player_spawn_events: MessageWriter<PlayerSpawnEvent>,
     asset_server: Res<AssetServer>,
 ) {
-    commands.spawn(Camera2dBundle::default());
+    commands.spawn(Camera2d);
 
     let skeleton = SkeletonData::new_from_binary(
         asset_server.load("spineboy/export/spineboy-pro.skel"),
         asset_server.load("spineboy/export/spineboy-pma.atlas"),
     );
     let skeleton_handle = skeletons.add(skeleton);
-    player_spawn_events.send(PlayerSpawnEvent {
+    player_spawn_events.write(PlayerSpawnEvent {
         skeleton: skeleton_handle,
     });
 }

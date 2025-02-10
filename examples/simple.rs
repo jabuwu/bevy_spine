@@ -16,7 +16,7 @@ fn setup(
     mut commands: Commands,
     mut skeletons: ResMut<Assets<SkeletonData>>,
 ) {
-    commands.spawn(Camera2dBundle::default());
+    commands.spawn(Camera2d);
 
     let skeleton = SkeletonData::new_from_json(
         asset_server.load("spineboy/export/spineboy-pro.json"),
@@ -25,14 +25,14 @@ fn setup(
     let skeleton_handle = skeletons.add(skeleton);
 
     commands.spawn(SpineBundle {
-        skeleton: skeleton_handle.clone(),
+        skeleton: skeleton_handle.into(),
         transform: Transform::from_xyz(0., -200., 0.),
         ..Default::default()
     });
 }
 
 fn on_spawn(
-    mut spine_ready_event: EventReader<SpineReadyEvent>,
+    mut spine_ready_event: MessageReader<SpineReadyEvent>,
     mut spine_query: Query<&mut Spine>,
 ) {
     for event in spine_ready_event.read() {
