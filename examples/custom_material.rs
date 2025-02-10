@@ -8,7 +8,7 @@ use bevy::{
             AsBindGroup, RenderPipelineDescriptor, ShaderRef, SpecializedMeshPipelineError,
         },
     },
-    sprite::{Material2d, Material2dKey, Material2dPlugin},
+    sprite::{AlphaMode2d, Material2d, Material2dKey, Material2dPlugin},
 };
 use bevy_spine::{
     materials::{
@@ -37,7 +37,7 @@ fn setup(
     mut commands: Commands,
     mut skeletons: ResMut<Assets<SkeletonData>>,
 ) {
-    commands.spawn(Camera2dBundle::default());
+    commands.spawn(Camera2d);
 
     let skeleton = SkeletonData::new_from_json(
         asset_server.load("spineboy/export/spineboy-pro.json"),
@@ -47,7 +47,7 @@ fn setup(
 
     // Spine with no custom materials
     commands.spawn((SpineBundle {
-        skeleton: skeleton_handle.clone(),
+        skeleton: skeleton_handle.clone().into(),
         transform: Transform::from_xyz(-230., -130., 0.).with_scale(Vec3::ONE * 0.375),
         ..Default::default()
     },));
@@ -55,7 +55,7 @@ fn setup(
     // Spine with custom materials
     commands.spawn((
         SpineBundle {
-            skeleton: skeleton_handle.clone(),
+            skeleton: skeleton_handle.clone().into(),
             transform: Transform::from_xyz(230., -130., 0.).with_scale(Vec3::ONE * 0.375),
             settings: SpineSettings {
                 default_materials: false,
@@ -103,6 +103,10 @@ impl Material2d for MyMaterial {
         "shaders/custom.wgsl".into()
     }
 
+    fn alpha_mode(&self) -> AlphaMode2d {
+        AlphaMode2d::Blend
+    }
+
     fn specialize(
         descriptor: &mut RenderPipelineDescriptor,
         layout: &MeshVertexBufferLayoutRef,
@@ -129,6 +133,7 @@ pub struct MyMaterialParam<'w, 's> {
 }
 
 impl SpineMaterial for MyMaterial {
+    type MeshMaterial = MeshMaterial2d<Self>;
     type Material = Self;
     type Params<'w, 's> = MyMaterialParam<'w, 's>;
 
@@ -141,7 +146,7 @@ impl SpineMaterial for MyMaterial {
         if let Ok(spine) = params.my_spine_query.get(entity) {
             let mut material = material.unwrap_or_default();
             material.image = renderable_data.texture;
-            material.time = params.time.elapsed_seconds();
+            material.time = params.time.elapsed_secs();
             if let Some(slot) = spine
                 .skeleton
                 .slot_at_index(renderable_data.slot_index.unwrap_or(9999))

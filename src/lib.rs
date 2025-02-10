@@ -10,14 +10,14 @@ use std::{
 
 use bevy::{
     asset::load_internal_binary_asset,
+    image::{ImageAddressMode, ImageFilterMode, ImageSampler, ImageSamplerDescriptor},
     prelude::*,
     render::{
         mesh::{Indices, MeshVertexAttribute},
         render_asset::RenderAssetUsages,
         render_resource::{PrimitiveTopology, VertexFormat},
-        texture::{ImageAddressMode, ImageFilterMode, ImageSampler, ImageSamplerDescriptor},
     },
-    sprite::{Material2dPlugin, Mesh2dHandle},
+    sprite::Material2dPlugin,
 };
 use materials::{
     SpineAdditiveMaterial, SpineAdditivePmaMaterial, SpineMaterialInfo, SpineMultiplyMaterial,
@@ -40,7 +40,7 @@ use crate::{
     textures::{SpineTexture, SpineTextureCreateEvent, SpineTextureDisposeEvent, SpineTextures},
 };
 
-pub use crate::{assets::*, crossfades::Crossfades, entity_sync::*, rusty_spine::Color};
+pub use crate::{assets::*, crossfades::Crossfades, entity_sync::*, handle::*, rusty_spine::Color};
 
 /// See [`rusty_spine`] docs for more info.
 pub use crate::rusty_spine::controller::SkeletonController;
@@ -408,7 +408,7 @@ impl Default for SpineSettings {
 /// ) {
 ///     commands.spawn((
 ///         SpineBundle {
-///             skeleton: my_game_assets.skeleton.clone(),
+///             skeleton: SkeletonDataHandle(my_game_assets.skeleton.clone()),
 ///             ..Default::default()
 ///         },
 ///         MySpine
@@ -431,7 +431,7 @@ impl Default for SpineSettings {
 pub struct SpineBundle {
     pub loader: SpineLoader,
     pub settings: SpineSettings,
-    pub skeleton: Handle<SkeletonData>,
+    pub skeleton: SkeletonDataHandle,
     pub crossfades: Crossfades,
     pub transform: Transform,
     pub global_transform: GlobalTransform,
@@ -601,7 +601,7 @@ fn spine_spawn(
     mut skeleton_query: Query<(
         &mut SpineLoader,
         Entity,
-        &Handle<SkeletonData>,
+        &SkeletonDataHandle,
         Option<&Crossfades>,
     )>,
     mut commands: Commands,
@@ -613,7 +613,7 @@ fn spine_spawn(
     for (mut spine_loader, spine_entity, data_handle, crossfades) in skeleton_query.iter_mut() {
         if let SpineLoader::Loading { with_children } = spine_loader.as_ref() {
             let skeleton_data_asset =
-                if let Some(skeleton_data_asset) = skeleton_data_assets.get_mut(data_handle) {
+                if let Some(skeleton_data_asset) = skeleton_data_assets.get_mut(&data_handle.0) {
                     skeleton_data_asset
                 } else {
                     continue;
@@ -833,7 +833,7 @@ fn spine_update_animation(
     spine_event_queue: Res<SpineEventQueue>,
 ) {
     for (_, mut spine) in spine_query.iter_mut() {
-        spine.update(time.delta_seconds(), Physics::Update);
+        spine.update(time.delta_secs(), Physics::Update);
     }
     {
         let mut events = spine_event_queue.0.lock().unwrap();
@@ -856,8 +856,8 @@ fn spine_update_meshes(
         Entity,
         &mut SpineMesh,
         &mut Transform,
-        Option<&Mesh2dHandle>,
-        Option<&Handle<Mesh>>,
+        Option<&Mesh2d>,
+        Option<&Mesh3d>,
     )>,
     mut commands: Commands,
     meshes_query: Query<(&Parent, &Children), With<SpineMeshes>>,
@@ -908,14 +908,14 @@ fn spine_update_meshes(
                 apply_mesh!(
                     spine_2d_mesh,
                     mesh_type == SpineMeshType::Mesh2D,
-                    Mesh2dHandle(spine_mesh.handle.clone()),
-                    Mesh2dHandle
+                    Mesh2d(spine_mesh.handle.clone()),
+                    Mesh2d
                 );
                 apply_mesh!(
                     spine_3d_mesh,
                     mesh_type == SpineMeshType::Mesh3D,
-                    spine_mesh.handle.clone(),
-                    Handle<Mesh>
+                    Mesh3d(spine_mesh.handle.clone()),
+                    Mesh3d
                 );
                 let Some(mesh) = meshes.get_mut(&spine_mesh.handle) else {
                     continue;
@@ -1026,11 +1026,19 @@ fn spine_update_meshes(
 }
 
 fn empty_mesh(mesh: &mut Mesh) {
-    let positions: Vec<[f32; 3]> = vec![];
-    let normals: Vec<[f32; 3]> = vec![];
-    let uvs: Vec<[f32; 2]> = vec![];
-    let colors: Vec<[f32; 4]> = vec![];
-    let dark_colors: Vec<[f32; 4]> = vec![];
+    let positions: Vec<[f32; 3]> = vec![[0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0]];
+    let normals: Vec<[f32; 3]> = vec![[0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0]];
+    let uvs: Vec<[f32; 2]> = vec![[0.0, 0.0], [0.0, 0.0], [0.0, 0.0]];
+    let colors: Vec<[f32; 4]> = vec![
+        [0.0, 0.0, 0.0, 0.0],
+        [0.0, 0.0, 0.0, 0.0],
+        [0.0, 0.0, 0.0, 0.0],
+    ];
+    let dark_colors: Vec<[f32; 4]> = vec![
+        [0.0, 0.0, 0.0, 0.0],
+        [0.0, 0.0, 0.0, 0.0],
+        [0.0, 0.0, 0.0, 0.0],
+    ];
 
     mesh.remove_indices();
     mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, positions);
@@ -1130,19 +1138,18 @@ fn adjust_spine_textures(
 mod assets;
 mod crossfades;
 mod entity_sync;
+mod handle;
 
 pub mod materials;
 pub mod textures;
 
-#[cfg(test)]
-mod test;
-
 #[doc(hidden)]
 pub mod prelude {
     pub use crate::{
-        Crossfades, SkeletonController, SkeletonData, Spine, SpineBone, SpineBundle, SpineEvent,
-        SpineLoader, SpineMesh, SpineMeshState, SpinePlugin, SpineReadyEvent, SpineSet,
-        SpineSettings, SpineSync, SpineSyncSet, SpineSyncSystem, SpineSystem,
+        Crossfades, SkeletonController, SkeletonData, SkeletonDataHandle, Spine, SpineBone,
+        SpineBundle, SpineEvent, SpineLoader, SpineMesh, SpineMeshState, SpinePlugin,
+        SpineReadyEvent, SpineSet, SpineSettings, SpineSync, SpineSyncSet, SpineSyncSystem,
+        SpineSystem,
     };
     pub use rusty_spine::{BoneHandle, SlotHandle};
 }

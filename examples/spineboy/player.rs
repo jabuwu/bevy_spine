@@ -78,7 +78,7 @@ fn player_spawn(mut commands: Commands, mut player_spawn_events: EventReader<Pla
     for event in player_spawn_events.read() {
         commands
             .spawn(SpineBundle {
-                skeleton: event.skeleton.clone(),
+                skeleton: event.skeleton.clone().into(),
                 transform: Transform::from_xyz(-300., -200., 0.).with_scale(Vec3::ONE * 0.25),
                 ..Default::default()
             })
@@ -182,7 +182,11 @@ fn player_aim(
     };
     let cursor_position = window
         .cursor_position()
-        .and_then(|cursor| camera.viewport_to_world(camera_global_transform, cursor))
+        .and_then(|cursor| {
+            camera
+                .viewport_to_world(camera_global_transform, cursor)
+                .ok()
+        })
         .map(|ray| ray.origin.truncate())
         .unwrap_or(Vec2::ZERO);
     for (mut spine, player_entity, crosshair, player) in crosshair_query.iter_mut() {
@@ -211,7 +215,7 @@ fn player_aim(
                 {
                     let alpha = aim_track.alpha() * 2.5;
                     aim_track
-                        .set_alpha(lerp::Lerp::lerp(alpha, 1., time.delta_seconds()).clamp(0., 1.));
+                        .set_alpha(lerp::Lerp::lerp(alpha, 1., time.delta_secs()).clamp(0., 1.));
                 }
             }
         }
@@ -227,7 +231,7 @@ fn player_shoot(
     time: Res<Time>,
 ) {
     for (mut shoot, player) in shoot_query.iter_mut() {
-        shoot.cooldown = (shoot.cooldown - time.delta_seconds()).max(0.);
+        shoot.cooldown = (shoot.cooldown - time.delta_secs()).max(0.);
         if mouse_buttons.just_pressed(MouseButton::Left) && player.spawned && shoot.cooldown == 0. {
             let mut scale_x = 1.;
             if let Ok((mut spine, spine_transform)) = spine_query.get_mut(shoot.spine) {
@@ -264,12 +268,11 @@ fn player_move(
                 movement += 1.;
             }
             player.movement_velocity =
-                (player.movement_velocity + movement * 20. * time.delta_seconds()).clamp(-1., 1.);
+                (player.movement_velocity + movement * 20. * time.delta_secs()).clamp(-1., 1.);
             if movement == 0. {
-                player.movement_velocity *= 0.0001_f32.powf(time.delta_seconds());
+                player.movement_velocity *= 0.0001_f32.powf(time.delta_secs());
             }
-            player_transform.translation.x +=
-                player.movement_velocity * time.delta_seconds() * 500.;
+            player_transform.translation.x += player.movement_velocity * time.delta_secs() * 500.;
             player_transform.translation.x = player_transform.translation.x.clamp(-500., 500.);
             if let Some(mut track) = player_spine
                 .animation_state

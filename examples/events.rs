@@ -24,7 +24,7 @@ fn setup(
     mut commands: Commands,
     mut skeletons: ResMut<Assets<SkeletonData>>,
 ) {
-    commands.spawn(Camera2dBundle::default());
+    commands.spawn(Camera2d);
 
     let skeleton = SkeletonData::new_from_json(
         asset_server.load("spineboy/export/spineboy-pro.json"),
@@ -33,7 +33,7 @@ fn setup(
     let skeleton_handle = skeletons.add(skeleton);
 
     commands.spawn(SpineBundle {
-        skeleton: skeleton_handle.clone(),
+        skeleton: skeleton_handle.clone().into(),
         transform: Transform::from_xyz(0., -200., 0.).with_scale(Vec3::ONE * 0.5),
         ..Default::default()
     });
@@ -53,27 +53,11 @@ fn on_spawn(
     }
 }
 
-fn on_spine_event(
-    mut spine_events: EventReader<SpineEvent>,
-    mut commands: Commands,
-    asset_server: Res<AssetServer>,
-) {
+fn on_spine_event(mut spine_events: EventReader<SpineEvent>, mut commands: Commands) {
     for event in spine_events.read() {
         if let SpineEvent::Event { name, .. } = event {
             commands
-                .spawn(Text2dBundle {
-                    text: Text::from_section(
-                        name.as_str(),
-                        TextStyle {
-                            font: asset_server.load("FiraMono-Medium.ttf"),
-                            font_size: 22.0,
-                            color: Color::WHITE,
-                        },
-                    )
-                    .with_justify(JustifyText::Center),
-                    transform: Transform::from_xyz(0., -200., 1.),
-                    ..Default::default()
-                })
+                .spawn((Text2d(name.to_string()), Transform::from_xyz(0., -200., 1.)))
                 .insert(Footstep);
         }
     }
@@ -83,15 +67,15 @@ fn on_spine_event(
 struct Footstep;
 
 fn footstep_update(
-    mut footstep_query: Query<(&mut Transform, &mut Text, Entity), With<Footstep>>,
+    mut footstep_query: Query<(&mut Transform, &mut TextColor, Entity), With<Footstep>>,
     mut commands: Commands,
     time: Res<Time>,
 ) {
-    for (mut transform, mut text, entity) in footstep_query.iter_mut() {
-        transform.translation.y += time.delta_seconds() * 70.;
-        let mut alpha = text.sections[0].style.color.alpha();
-        alpha = (alpha - time.delta_seconds() * 2.).clamp(0., 1.);
-        text.sections[0].style.color.set_alpha(alpha);
+    for (mut transform, mut text_color, entity) in footstep_query.iter_mut() {
+        transform.translation.y += time.delta_secs() * 70.;
+        let mut alpha = text_color.alpha();
+        alpha = (alpha - time.delta_secs() * 2.).clamp(0., 1.);
+        text_color.set_alpha(alpha);
         if alpha == 0. {
             commands.entity(entity).despawn();
         }
