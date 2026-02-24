@@ -4,7 +4,7 @@ use bevy::{
     image::Image,
     prelude::*,
     render::render_resource::{Extent3d, TextureDimension, TextureFormat, TextureUsages},
-    ui::{widget::ViewportNode, ContentSize},
+    ui::{ContentSize, widget::ViewportNode},
 };
 
 use crate::{
