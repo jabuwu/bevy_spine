@@ -8,7 +8,7 @@ use bevy::{
 };
 
 use crate::{
-    Crossfades, SkeletonController, SkeletonDataHandle, Spine, SpineBundle, SpineLoader,
+    Crossfades, SkeletonController, SkeletonData, SkeletonDataHandle, Spine, SpineLoader,
     SpineReadyEvent, SpineSettings,
 };
 
@@ -17,6 +17,7 @@ pub struct SpineUiPlugin;
 impl Plugin for SpineUiPlugin {
     fn build(&self, app: &mut App) {
         app.register_type::<SpineUiNode>()
+            .register_type::<SpineUiSkeleton>()
             .register_type::<SpineUiFit>()
             .register_type::<SpineUiAnimation>()
             .register_type::<SpineUiProxy>()
@@ -37,6 +38,7 @@ impl Plugin for SpineUiPlugin {
 }
 
 #[derive(Component, Clone, Debug, Reflect)]
+#[require(Node, Crossfades, SpineSettings)]
 #[reflect(Component, Default)]
 pub struct SpineUiNode {
     pub fit: SpineUiFit,
@@ -47,6 +49,16 @@ pub struct SpineUiNode {
     pub flip_y: bool,
     pub tint: Color,
     pub animation: Option<SpineUiAnimation>,
+}
+
+#[derive(Component, Clone, Debug, Reflect)]
+#[reflect(Component, Default, Clone)]
+pub struct SpineUiSkeleton(pub Handle<SkeletonData>);
+
+impl Default for SpineUiSkeleton {
+    fn default() -> Self {
+        Self(default())
+    }
 }
 
 impl Default for SpineUiNode {
@@ -89,21 +101,16 @@ impl SpineUiAnimation {
     }
 }
 
-#[derive(Bundle, Default)]
-pub struct SpineUiBundle {
-    pub node: Node,
-    pub spine_ui: SpineUiNode,
-    pub skeleton: SkeletonDataHandle,
-    pub crossfades: Crossfades,
-    pub settings: SpineSettings,
-}
-
 #[derive(Component, Clone, Copy, Debug, Reflect)]
 #[reflect(Component)]
 pub struct SpineUiProxy {
     pub proxy_entity: Entity,
     pub camera_entity: Entity,
 }
+
+#[derive(Component, Clone, Copy, Debug, Default, Reflect)]
+#[reflect(Component, Default)]
+struct SpineUiDebugState;
 
 #[derive(Message, Clone, Copy, Debug)]
 pub struct SpineUiReadyEvent {
@@ -122,7 +129,7 @@ fn setup_spine_ui_nodes(
     nodes: Query<
         (
             Entity,
-            &SkeletonDataHandle,
+            &SpineUiSkeleton,
             &Crossfades,
             &SpineSettings,
             &SpineUiNode,
@@ -164,13 +171,10 @@ fn setup_spine_ui_nodes(
 
         let proxy_entity = commands
             .spawn((
-                SpineBundle {
-                    skeleton: skeleton.clone(),
-                    crossfades: crossfades.clone(),
-                    settings: proxy_settings,
-                    loader: SpineLoader::without_children(),
-                    ..default()
-                },
+                SkeletonDataHandle(skeleton.0.clone()),
+                crossfades.clone(),
+                proxy_settings,
+                SpineLoader::without_children(),
                 SpineUiOwnedBy(entity),
             ))
             .id();

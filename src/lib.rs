@@ -1,6 +1,6 @@
 //! A Bevy plugin for Spine 4.2
 //!
-//! Add [`SpinePlugin`] to your Bevy app and spawn a [`SpineBundle`] to get started!
+//! Add [`SpinePlugin`] to your Bevy app and spawn a [`SkeletonDataHandle`] to get started!
 
 use std::{
     collections::{HashMap, VecDeque},
@@ -8,18 +8,13 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use bevy::asset::RenderAssetUsages;
-use bevy::mesh::{Indices, MeshVertexAttribute};
-use bevy::sprite_render::Material2dPlugin;
 use bevy::{
-    asset::load_internal_binary_asset,
+    asset::{RenderAssetUsages, load_internal_binary_asset},
     image::{ImageAddressMode, ImageFilterMode, ImageSampler, ImageSamplerDescriptor},
+    mesh::{Indices, MeshVertexAttribute},
     prelude::*,
-    render::{
-        render::render_resource::{PrimitiveTopology, VertexFormat},
-    },
-    sprite::Material2dPlugin,
     render::render_resource::{PrimitiveTopology, VertexFormat},
+    sprite_render::Material2dPlugin,
 };
 use materials::{
     SpineAdditiveMaterial, SpineAdditivePmaMaterial, SpineMaterialInfo, SpineMultiplyMaterial,
@@ -55,15 +50,16 @@ pub use rusty_spine;
 /// System sets for Spine systems.
 #[derive(Debug, Hash, PartialEq, Eq, Clone, Copy, SystemSet)]
 pub enum SpineSystem {
-    /// Loads [`SkeletonData`] assets which must exist before a [`SpineBundle`] can fully load.
+    /// Loads [`SkeletonData`] assets which must exist before a [`SkeletonDataHandle`] can fully
+    /// load.
     Load,
-    /// Spawns helper entities associated with a [`SpineBundle`] for drawing meshes and
-    /// (optionally) adding bone entities (see [`SpineLoader`]).
+    /// Spawns helper entities associated with entities containing [`SkeletonDataHandle`] for
+    /// drawing meshes and (optionally) adding bone entities (see [`SpineLoader`]).
     Spawn,
     /// An [`apply_deferred`] to load the spine helper entities this frame.
     SpawnFlush,
-    /// Sends [`SpineReadyEvent`] after [`SpineSystem::SpawnFlush`], indicating [`Spine`] components
-    /// on newly spawned [`SpineBundle`]s can now be interacted with.
+    /// Sends [`SpineReadyEvent`] after [`SpineSystem::SpawnFlush`], indicating [`Spine`]
+    /// components on newly spawned entities can now be interacted with.
     Ready,
     /// Advances all animations and processes Spine events (see [`SpineEvent`]).
     UpdateAnimation,
@@ -209,9 +205,9 @@ struct SpineEventQueue(Arc<Mutex<VecDeque<SpineEvent>>>);
 
 /// A live Spine [`SkeletonController`] [`Component`], ready to be manipulated.
 ///
-/// This component does not exist on [`SpineBundle`] initially, since Spine assets may not yet be
-/// loaded when an entity is spawned. Querying for this component type guarantees that all entities
-/// containing it have a Spine rig that is ready to use.
+/// This component does not exist immediately when an entity is spawned with
+/// [`SkeletonDataHandle`], since Spine assets may not yet be loaded. Querying for this component
+/// type guarantees that all entities containing it have a Spine rig that is ready to use.
 #[derive(Component, Debug, Reflect)]
 #[reflect(Component, Debug, from_reflect = false)]
 pub struct Spine(#[reflect(ignore)] pub SkeletonController);
@@ -293,8 +289,8 @@ impl core::ops::DerefMut for Spine {
 /// The async loader for Spine assets. Waits for Spine assets to be ready in the [`AssetServer`],
 /// then initializes child entities, and finally attaches the live [`Spine`] component.
 ///
-/// When spawning a [`SpineLoader`] (typically through [`SpineBundle`]), it will create child
-/// entities representing the bones of a skeleton (see [`SpineBone`]). These bones are not
+/// When spawning a [`SkeletonDataHandle`], a [`SpineLoader`] is added automatically. It will create
+/// child entities representing the bones of a skeleton (see [`SpineBone`]). These bones are not
 /// synchronized (see [`SpineSync`]), and can be disabled entirely using
 /// [`SpineLoader::without_children`].
 #[derive(Component, Debug, Reflect)]
@@ -334,13 +330,12 @@ impl SpineLoader {
     ///
     /// ```
     /// # use bevy::prelude::*;
-    /// # use bevy_spine::{SpineLoader, SpineBundle};
+    /// # use bevy_spine::{SkeletonDataHandle, SpineLoader};
     /// # fn doc(mut commands: Commands) {
-    /// commands.spawn(SpineBundle {
-    ///     // ..
-    ///     loader: SpineLoader::without_children(),
-    ///     ..Default::default()
-    /// });
+    /// commands.spawn((
+    ///     SkeletonDataHandle::default(),
+    ///     SpineLoader::without_children(),
+    /// ));
     /// # }
     /// ```
     pub fn without_children() -> Self {
@@ -352,7 +347,7 @@ impl SpineLoader {
 
 /// Settings for how this Spine updates and renders.
 ///
-/// Typically set in [`SpineBundle`] when spawning an entity.
+/// Typically set alongside [`SkeletonDataHandle`] when spawning an entity.
 #[derive(Component, Debug, Clone, Copy, PartialEq, Eq, Reflect)]
 #[reflect(Component, Debug, PartialEq, Clone)]
 pub struct SpineSettings {
@@ -411,83 +406,10 @@ impl Default for SpineSettings {
     }
 }
 
-/// Bundle for Spine skeletons with all the necessary components.
+/// Spawn an entity with [`SkeletonDataHandle`] to load and instantiate a Spine skeleton.
 ///
-/// See [`SkeletonData::new_from_json`] or [`SkeletonData::new_from_binary`] for example usages.
-///
-/// Note that this bundle does not contain the [`Spine`] component itself, which is the primary way
-/// to query and interact with Spine skeletons. Instead, a [`SpineLoader`] is added which ensures
-/// that all the necessary assets ([`Atlas`] and [`SkeletonJson`]/[`SkeletonBinary`]) are loaded
-/// before instantiating the Spine skeleton. This ensures that querying for [`Spine`] components
-/// will always yield fully instantiated skeletons.
-///
-/// It is possible to spawn a Spine skeleton and initialize it in the same frame. To do so, ensure
-/// that the spawning system occurs before [`SpineSystem::Spawn`] and the initializing system is in
-/// the [`SpineSet::OnReady`] set (assuming the [`SkeletonData`] has already been loaded). Listen
-/// for [`SpineReadyEvent`] to get newly loaded skeletons.
-///
-/// ```
-/// use bevy::prelude::*;
-/// use bevy_spine::prelude::*;
-///
-/// # let mut app = App::new();
-/// {
-///     // in main() or a plugin
-///     app.add_systems(
-///         Update,
-///         (
-///             spawn_spine.before(SpineSystem::Spawn),
-///             init_spine.in_set(SpineSet::OnReady),
-///         ),
-///     );
-/// }
-///
-/// #[derive(Resource)]
-/// struct MyGameAssets {
-///     // loaded ahead of time
-///     skeleton: Handle<SkeletonData>
-/// }
-///
-/// #[derive(Component)]
-/// struct MySpine;
-///
-/// fn spawn_spine(
-///     mut commands: Commands,
-///     my_game_assets: Res<MyGameAssets>
-/// ) {
-///     commands.spawn((
-///         SpineBundle {
-///             skeleton: SkeletonDataHandle(my_game_assets.skeleton.clone()),
-///             ..Default::default()
-///         },
-///         MySpine
-///     ));
-/// }
-///
-/// fn init_spine(
-///     mut spine_ready_events: EventReader<SpineReadyEvent>,
-///     mut spine_query: Query<&mut Spine, With<MySpine>>
-/// ) {
-///     for spine_ready_event in spine_ready_events.read() {
-///         if let Ok(mut spine) = spine_query.get_mut(spine_ready_event.entity) {
-///             // the skeleton will start playing the animation the same frame it spawns on
-///             spine.animation_state.set_animation_by_name(0, "animation", true);
-///         }
-///     }
-/// }
-/// ```
-#[derive(Default, Bundle)]
-pub struct SpineBundle {
-    pub loader: SpineLoader,
-    pub settings: SpineSettings,
-    pub skeleton: SkeletonDataHandle,
-    pub crossfades: Crossfades,
-    pub transform: Transform,
-    pub global_transform: GlobalTransform,
-    pub visibility: Visibility,
-    pub inherited_visibility: InheritedVisibility,
-    pub view_visibility: ViewVisibility,
-}
+/// Optional components such as [`SpineLoader`], [`SpineSettings`], [`Crossfades`],
+/// [`Transform`], and [`Visibility`] are provided automatically through required components.
 
 /// A [`Message`] which is sent once a [`SpineLoader`] has fully loaded a skeleton and attached the
 /// [`Spine`] component.
@@ -1235,13 +1157,10 @@ pub mod textures;
 pub mod prelude {
     pub use crate::{
         Crossfades, SkeletonController, SkeletonData, SkeletonDataHandle, Spine, SpineBone,
-        SpineBundle, SpineEvent, SpineLoader, SpineMesh, SpineMeshState, SpinePlugin,
-        SpineReadyEvent, SpineSet, SpineSettings, SpineSync, SpineSyncSet, SpineSyncSystem,
-        SpineSystem,
+        SpineEvent, SpineLoader, SpineMesh, SpineMeshState, SpinePlugin, SpineReadyEvent, SpineSet,
+        SpineSettings, SpineSync, SpineSyncSet, SpineSyncSystem, SpineSystem,
     };
     #[cfg(feature = "ui")]
-    pub use crate::{
-        SpineUiBundle, SpineUiFit, SpineUiNode, SpineUiProxy, SpineUiReadyEvent,
-    };
+    pub use crate::{SpineUiFit, SpineUiNode, SpineUiProxy, SpineUiReadyEvent, SpineUiSkeleton};
     pub use rusty_spine::{BoneHandle, SlotHandle};
 }

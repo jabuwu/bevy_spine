@@ -76,17 +76,15 @@ pub struct ShootController {
 
 fn player_spawn(mut commands: Commands, mut player_spawn_events: MessageReader<PlayerSpawnEvent>) {
     for event in player_spawn_events.read() {
-        commands
-            .spawn(SpineBundle {
-                skeleton: event.skeleton.clone().into(),
-                transform: Transform::from_xyz(-300., -200., 0.).with_scale(Vec3::ONE * 0.25),
-                ..Default::default()
-            })
-            .insert(SpineSync)
-            .insert(Player {
+        commands.spawn((
+            SkeletonDataHandle(event.skeleton.clone()),
+            Transform::from_xyz(-300., -200., 0.).with_scale(Vec3::ONE * 0.25),
+            SpineSync,
+            Player {
                 spawned: false,
                 movement_velocity: 0.,
-            });
+            },
+        ));
     }
 }
 

@@ -71,10 +71,7 @@ pub enum SpineSynchronizerSet<T: SpineSynchronizer> {
 /// fn spawn(mut commands: Commands) {
 ///     // .. load spine ..
 ///     commands.spawn((
-///         SpineBundle {
-///             // ..
-///             ..Default::default()
-///         },
+///         SkeletonDataHandle::default(),
 ///         // synchronize in both steps
 ///         SpineSync,
 ///         MySpineSync,
@@ -205,13 +202,10 @@ pub fn spine_sync_entities_applied<S: SpineSynchronizer>(
 ///
 /// ```
 /// # use bevy::prelude::*;
-/// # use bevy_spine::{SpineLoader, SpineBundle, SpineSync};
+/// # use bevy_spine::{SkeletonDataHandle, SpineLoader, SpineSync};
 /// # fn doc(mut commands: Commands) {
 /// commands.spawn((
-///     SpineBundle {
-///         // ..
-///         ..Default::default()
-///     },
+///     SkeletonDataHandle::default(),
 ///     SpineSync
 /// ));
 /// # }
@@ -253,10 +247,7 @@ pub type SpineSyncSystem = SpineSynchronizerSystem<SpineSync>;
 /// fn spawn(mut commands: Commands) {
 ///     // .. load spine ..
 ///     commands.spawn((
-///         SpineBundle {
-///             // ..
-///             ..Default::default()
-///         },
+///         SkeletonDataHandle::default(),
 ///         SpineSync,
 ///     ));
 /// }

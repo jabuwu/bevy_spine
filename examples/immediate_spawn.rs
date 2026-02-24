@@ -1,9 +1,9 @@
-//! Demonstrates how to spawn a [`SpineBundle`] and use it in one frame.
+//! Demonstrates how to spawn a Spine entity and use it in one frame.
 
 use bevy::diagnostic::FrameCount;
 use bevy::prelude::*;
 use bevy_spine::{
-    SkeletonData, Spine, SpineBundle, SpinePlugin, SpineReadyEvent, SpineSet, SpineSystem,
+    SkeletonData, SkeletonDataHandle, Spine, SpinePlugin, SpineReadyEvent, SpineSet, SpineSystem,
 };
 
 #[derive(Debug, Hash, PartialEq, Eq, Clone, SystemSet)]
@@ -59,11 +59,10 @@ fn spawn(
     if !demo_data.spawned {
         if let Some(skeleton) = skeletons.get(&demo_data.skeleton_handle) {
             if skeleton.is_loaded() {
-                commands.spawn(SpineBundle {
-                    skeleton: demo_data.skeleton_handle.clone().into(),
-                    transform: Transform::from_xyz(0., -200., 0.).with_scale(Vec3::ONE * 0.5),
-                    ..Default::default()
-                });
+                commands.spawn((
+                    SkeletonDataHandle(demo_data.skeleton_handle.clone()),
+                    Transform::from_xyz(0., -200., 0.).with_scale(Vec3::ONE * 0.5),
+                ));
                 demo_data.spawned = true;
                 println!("spawned on frame: {}", frame_count.0);
             }

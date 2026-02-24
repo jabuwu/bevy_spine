@@ -10,7 +10,7 @@ use bevy::{
     },
 };
 use bevy_spine::{
-    SkeletonController, SkeletonData, Spine, SpineBundle, SpineDrawer, SpinePlugin,
+    SkeletonController, SkeletonData, SkeletonDataHandle, Spine, SpineDrawer, SpinePlugin,
     SpineReadyEvent, SpineSet, SpineSettings,
     materials::{
         DARK_COLOR_ATTRIBUTE, DARK_COLOR_SHADER_POSITION, SpineMaterial, SpineMaterialInfo,
@@ -45,22 +45,18 @@ fn setup(
     let skeleton_handle = skeletons.add(skeleton);
 
     // Spine with no custom materials
-    commands.spawn((SpineBundle {
-        skeleton: skeleton_handle.clone().into(),
-        transform: Transform::from_xyz(-230., -130., 0.).with_scale(Vec3::ONE * 0.375),
-        ..Default::default()
-    },));
+    commands.spawn((
+        SkeletonDataHandle(skeleton_handle.clone()),
+        Transform::from_xyz(-230., -130., 0.).with_scale(Vec3::ONE * 0.375),
+    ));
 
     // Spine with custom materials
     commands.spawn((
-        SpineBundle {
-            skeleton: skeleton_handle.clone().into(),
-            transform: Transform::from_xyz(230., -130., 0.).with_scale(Vec3::ONE * 0.375),
-            settings: SpineSettings {
-                default_materials: false,
-                drawer: SpineDrawer::Separated,
-                ..Default::default()
-            },
+        SkeletonDataHandle(skeleton_handle.clone()),
+        Transform::from_xyz(230., -130., 0.).with_scale(Vec3::ONE * 0.375),
+        SpineSettings {
+            default_materials: false,
+            drawer: SpineDrawer::Separated,
             ..Default::default()
         },
         MySpine,

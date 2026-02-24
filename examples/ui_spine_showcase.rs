@@ -1,7 +1,7 @@
 use bevy::{prelude::*, ui_render::UiDebugOptions};
 use bevy_spine::{
-    SkeletonController, SkeletonData, Spine, SpinePlugin, SpineUiAnimation, SpineUiBundle,
-    SpineUiFit, SpineUiNode, SpineUiProxy,
+    SkeletonController, SkeletonData, Spine, SpinePlugin, SpineUiAnimation, SpineUiFit,
+    SpineUiNode, SpineUiProxy, SpineUiSkeleton,
 };
 
 fn main() {
@@ -192,12 +192,7 @@ fn spawn_panel(
         ))
         .with_children(|panel| {
             panel.spawn((Text::new(title), TextColor(Color::srgb(0.9, 0.9, 0.95))));
-            let mut entity = panel.spawn(SpineUiBundle {
-                node: viewport_node,
-                spine_ui,
-                skeleton: skeleton.into(),
-                ..default()
-            });
+            let mut entity = panel.spawn((viewport_node, spine_ui, SpineUiSkeleton(skeleton)));
             if let Some(marker) = interactive {
                 entity.insert(marker);
             }

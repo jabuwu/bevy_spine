@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 use bevy_spine::{
-    Crossfades, SkeletonController, SkeletonData, Spine, SpineBundle, SpinePlugin, SpineReadyEvent,
-    SpineSet, SpineSystem,
+    Crossfades, SkeletonController, SkeletonData, SkeletonDataHandle, Spine, SpinePlugin,
+    SpineReadyEvent, SpineSet, SpineSystem,
 };
 
 fn main() {
@@ -35,14 +35,13 @@ fn setup(
     crossfades.add("idle", "walk", 0.5);
     crossfades.add("walk", "idle", 0.5);
 
-    commands.spawn(SpineBundle {
-        skeleton: skeleton_handle.clone().into(),
+    commands.spawn((
+        SkeletonDataHandle(skeleton_handle.clone()),
         crossfades,
-        transform: Transform::default()
+        Transform::default()
             .with_translation(Vec3::new(0., -200., 0.))
             .with_scale(Vec3::ONE * 0.5),
-        ..Default::default()
-    });
+    ));
 }
 
 fn on_spawn(

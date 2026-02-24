@@ -19,7 +19,7 @@ bevy_spine = "0.12"
 bevy_spine = { version = "0.12", features = ["ui"] }
 ```
 
-`SpineUiBundle` renders a Spine instance into a `ViewportNode`, so it can live inside Bevy UI layout.
+`SpineUiNode` renders a Spine instance into a `ViewportNode`, so it can live inside Bevy UI layout.
 
 Example:
 
@@ -27,7 +27,7 @@ Example:
 
 ## New in 0.12
 
-- Optional UI node rendering via `SpineUiBundle` and the `ui` feature.
+- Optional UI node rendering via `SpineUiNode` required components and the `ui` feature.
 - Visibility-aware mesh updates for off-screen skeletons (`SpineSettings::update_meshes_when_invisible`, defaults to `false` for optimized behavior).
 - Reflection support for core components and assets (`register_type` / `register_asset_reflect`) for inspector-friendly tooling.
 

@@ -1,7 +1,7 @@
 use bevy::{prelude::*, window::PrimaryWindow};
 use bevy_spine::{
-    SkeletonController, SkeletonData, Spine, SpineBone, SpineBundle, SpinePlugin, SpineReadyEvent,
-    SpineSet, SpineSync, SpineSyncSet,
+    SkeletonController, SkeletonData, SkeletonDataHandle, Spine, SpineBone, SpinePlugin,
+    SpineReadyEvent, SpineSet, SpineSync, SpineSyncSet,
 };
 
 #[derive(Component)]
@@ -35,11 +35,8 @@ fn setup(
     let skeleton_handle = skeletons.add(skeleton);
 
     commands.spawn((
-        SpineBundle {
-            transform: Transform::from_xyz(-200., -200., 0.).with_scale(Vec3::splat(0.5)),
-            skeleton: skeleton_handle.clone().into(),
-            ..Default::default()
-        },
+        SkeletonDataHandle(skeleton_handle.clone()),
+        Transform::from_xyz(-200., -200., 0.).with_scale(Vec3::splat(0.5)),
         SpineSync,
     ));
 }

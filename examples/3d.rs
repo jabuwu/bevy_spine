@@ -74,16 +74,15 @@ fn setup(
         asset_server.load("spineboy/export/spineboy-pma.atlas"),
     );
     let skeleton_handle = skeletons.add(skeleton);
-    commands.spawn(SpineBundle {
-        skeleton: skeleton_handle.clone().into(),
-        transform: Transform::from_xyz(0., 0., 0.).with_scale(Vec3::ONE * 0.005),
-        settings: SpineSettings {
+    commands.spawn((
+        SkeletonDataHandle(skeleton_handle.clone()),
+        Transform::from_xyz(0., 0., 0.).with_scale(Vec3::ONE * 0.005),
+        SpineSettings {
             default_materials: false,
             mesh_type: SpineMeshType::Mesh3D,
             ..Default::default()
         },
-        ..Default::default()
-    });
+    ));
 }
 
 fn on_spawn(

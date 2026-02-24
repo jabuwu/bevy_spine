@@ -171,14 +171,11 @@ impl SkeletonData {
     ///     )));
     ///
     ///     // to spawn the skeleton
-    ///     commands.spawn(SpineBundle {
-    ///         skeleton,
-    ///         ..Default::default()
-    ///     });
+    ///     commands.spawn(skeleton);
     /// }
     /// ```
     ///
-    /// For more information on the loading process, see [`SpineBundle`](`crate::SpineBundle`).
+    /// For more information on the loading process, see [`SkeletonDataHandle`].
     pub fn new_from_json(json: Handle<SkeletonJson>, atlas: Handle<Atlas>) -> Self {
         Self {
             atlas_handle: atlas,
@@ -208,14 +205,11 @@ impl SkeletonData {
     ///     )));
     ///
     ///     // to spawn the skeleton
-    ///     commands.spawn(SpineBundle {
-    ///         skeleton,
-    ///         ..Default::default()
-    ///     });
+    ///     commands.spawn(skeleton);
     /// }
     /// ```
     ///
-    /// For more information on the loading process, see [`SpineBundle`](`crate::SpineBundle`).
+    /// For more information on the loading process, see [`SkeletonDataHandle`].
     pub fn new_from_binary(binary: Handle<SkeletonBinary>, atlas: Handle<Atlas>) -> Self {
         Self {
             atlas_handle: atlas,
