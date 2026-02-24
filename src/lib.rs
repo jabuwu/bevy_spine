@@ -406,11 +406,6 @@ impl Default for SpineSettings {
     }
 }
 
-/// Spawn an entity with [`SkeletonDataHandle`] to load and instantiate a Spine skeleton.
-///
-/// Optional components such as [`SpineLoader`], [`SpineSettings`], [`Crossfades`],
-/// [`Transform`], and [`Visibility`] are provided automatically through required components.
-
 /// A [`Message`] which is sent once a [`SpineLoader`] has fully loaded a skeleton and attached the
 /// [`Spine`] component.
 ///
