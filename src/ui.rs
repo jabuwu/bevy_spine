@@ -159,9 +159,9 @@ fn setup_spine_ui_nodes(
                 Camera {
                     order: -1,
                     clear_color: ClearColorConfig::Custom(Color::NONE),
-                    target: RenderTarget::Image(image_handle.into()),
                     ..default()
                 },
+                RenderTarget::Image(image_handle.into()),
                 SpineUiOwnedBy(entity),
             ))
             .id();

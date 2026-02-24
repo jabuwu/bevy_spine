@@ -146,13 +146,14 @@ fn setup(
                         width: percent(100),
                         height: percent(100),
                         min_height: px(220),
+                        border: UiRect::all(px(1.0)),
+                        border_radius: BorderRadius::all(px(8)),
                         align_items: AlignItems::Center,
                         justify_content: JustifyContent::Center,
                         ..default()
                     },
                     BackgroundColor(Color::srgb(0.13, 0.14, 0.17)),
                     BorderColor::all(Color::srgb(0.24, 0.26, 0.33)),
-                    BorderRadius::all(px(8)),
                 ))
                 .with_children(|panel| {
                     panel.spawn((
@@ -184,11 +185,12 @@ fn spawn_panel(
                 flex_direction: FlexDirection::Column,
                 row_gap: px(6),
                 padding: UiRect::all(px(8)),
+                border: UiRect::all(px(1.0)),
+                border_radius: BorderRadius::all(px(8)),
                 ..default()
             },
             BackgroundColor(Color::srgb(0.11, 0.12, 0.15)),
             BorderColor::all(Color::srgb(0.24, 0.26, 0.33)),
-            BorderRadius::all(px(8)),
         ))
         .with_children(|panel| {
             panel.spawn((Text::new(title), TextColor(Color::srgb(0.9, 0.9, 0.95))));

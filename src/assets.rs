@@ -3,6 +3,7 @@ use std::{path::Path, sync::Arc};
 use bevy::{
     asset::{AssetLoader, LoadContext, io::Reader},
     prelude::*,
+    reflect::TypePath,
 };
 use rusty_spine::SpineError;
 use thiserror::Error;
@@ -24,7 +25,7 @@ pub struct Atlas {
     pub atlas: Arc<rusty_spine::Atlas>,
 }
 
-#[derive(Default)]
+#[derive(Default, TypePath)]
 pub(crate) struct AtlasLoader;
 
 impl AssetLoader for AtlasLoader {
@@ -40,14 +41,14 @@ impl AssetLoader for AtlasLoader {
     ) -> Result<Self::Asset, Self::Error> {
         let mut bytes = Vec::new();
         reader.read_to_end(&mut bytes).await?;
+        let atlas_dir = load_context
+            .path()
+            .path()
+            .parent()
+            .unwrap_or_else(|| Path::new(""));
+
         Ok(Atlas {
-            atlas: Arc::new(rusty_spine::Atlas::new(
-                &bytes,
-                load_context
-                    .path()
-                    .parent()
-                    .unwrap_or_else(|| Path::new("")),
-            )?),
+            atlas: Arc::new(rusty_spine::Atlas::new(&bytes, atlas_dir)?),
         })
     }
 
@@ -64,7 +65,7 @@ pub struct SkeletonJson {
     pub json: Vec<u8>,
 }
 
-#[derive(Default)]
+#[derive(Default, TypePath)]
 pub(crate) struct SkeletonJsonLoader;
 
 impl AssetLoader for SkeletonJsonLoader {
@@ -98,7 +99,7 @@ pub struct SkeletonBinary {
     pub binary: Vec<u8>,
 }
 
-#[derive(Default)]
+#[derive(Default, TypePath)]
 pub(crate) struct SkeletonBinaryLoader;
 
 impl AssetLoader for SkeletonBinaryLoader {

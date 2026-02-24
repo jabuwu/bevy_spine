@@ -428,7 +428,7 @@ pub struct SpineReadyEvent {
 /// # use bevy_spine::prelude::*;
 /// // bevy system
 /// fn on_spine_event(
-///     mut spine_events: EventReader<SpineEvent>,
+///     mut spine_events: MessageReader<SpineEvent>,
 ///     mut commands: Commands,
 ///     asset_server: Res<AssetServer>,
 /// ) {

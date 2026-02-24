@@ -1,3 +1,7 @@
+# 0.14.0
+- Update to Bevy 0.18.
+- Bump minimum Rust toolchain to 1.89.0.
+
 # 0.13.0
 - Breaking: migrate from bundle-based spawning to Bevy required components.
   - Remove `SpineBundle`; spawn with `SkeletonDataHandle` + optional overrides.
