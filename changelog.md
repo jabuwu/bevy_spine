@@ -1,3 +1,18 @@
+# 0.13.0
+- Breaking: migrate from bundle-based spawning to Bevy required components.
+  - Remove `SpineBundle`; spawn with `SkeletonDataHandle` + optional overrides.
+  - Remove `SpineUiBundle`; use `SpineUiNode` with `SpineUiSkeleton` for UI.
+
+# 0.12.0
+- Add optional UI node rendering via the `ui` feature.
+- Add visibility-aware mesh updates for off-screen skeletons via
+  `SpineSettings::update_meshes_when_invisible` (defaults to `false`).
+- Add reflection support for core components and assets.
+
+# 0.11.0
+- Update to Bevy 0.17.
+- Update dependencies for Bevy 0.17 compatibility.
+
 # 0.10.1
 - No code changes, fixed version in readme
 
