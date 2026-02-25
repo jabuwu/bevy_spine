@@ -126,39 +126,38 @@ fn player_spine_events(
     mut spine_query: Query<(&mut Spine, &mut Player)>,
 ) {
     for event in spine_events.read() {
-        if let SpineEvent::Complete { entity, animation } = event {
-            if let Ok((mut spine, mut player)) = spine_query.get_mut(*entity) {
-                let Spine(controller) = spine.as_mut();
-                if animation == "portal" {
-                    let _ = controller.animation_state.set_animation_by_name(
-                        PLAYER_TRACK_IDLE,
-                        "idle",
-                        true,
-                    );
-                    let _ = controller.animation_state.set_animation_by_name(
-                        PLAYER_TRACK_AIM,
-                        "aim",
-                        true,
-                    );
-                    let mut run_track = controller
-                        .animation_state
-                        .set_animation_by_name(PLAYER_TRACK_RUN, "run", true)
-                        .unwrap();
-                    run_track.set_shortest_rotation(true);
+        if let SpineEvent::Complete { entity, animation } = event
+            && let Ok((mut spine, mut player)) = spine_query.get_mut(*entity)
+        {
+            let Spine(controller) = spine.as_mut();
+            if animation == "portal" {
+                let _ = controller.animation_state.set_animation_by_name(
+                    PLAYER_TRACK_IDLE,
+                    "idle",
+                    true,
+                );
+                let _ =
                     controller
                         .animation_state
-                        .track_at_index_mut(PLAYER_TRACK_AIM)
-                        .unwrap()
-                        .set_alpha(0.);
-                    controller
-                        .animation_state
-                        .track_at_index_mut(PLAYER_TRACK_RUN)
-                        .unwrap()
-                        .set_alpha(0.);
-                    player.spawned = true;
-                } else if animation == "jump" {
-                    controller.animation_state.clear_track(PLAYER_TRACK_JUMP);
-                }
+                        .set_animation_by_name(PLAYER_TRACK_AIM, "aim", true);
+                let mut run_track = controller
+                    .animation_state
+                    .set_animation_by_name(PLAYER_TRACK_RUN, "run", true)
+                    .unwrap();
+                run_track.set_shortest_rotation(true);
+                controller
+                    .animation_state
+                    .track_at_index_mut(PLAYER_TRACK_AIM)
+                    .unwrap()
+                    .set_alpha(0.);
+                controller
+                    .animation_state
+                    .track_at_index_mut(PLAYER_TRACK_RUN)
+                    .unwrap()
+                    .set_alpha(0.);
+                player.spawned = true;
+            } else if animation == "jump" {
+                controller.animation_state.clear_track(PLAYER_TRACK_JUMP);
             }
         }
     }
@@ -186,33 +185,31 @@ fn player_aim(
         .map(|ray| ray.origin.truncate())
         .unwrap_or(Vec2::ZERO);
     for (mut spine, player_entity, crosshair, player) in crosshair_query.iter_mut() {
-        if player.spawned {
-            if let Ok((crosshair_entity, crosshair_parent)) = bone_query.get(crosshair.bone) {
-                let matrix = if let Ok(parent_transform) =
-                    global_transform_query.get(crosshair_parent.parent())
-                {
-                    parent_transform.to_matrix().inverse()
-                } else {
-                    Mat4::IDENTITY
-                };
-                let mut scale_x = 1.;
-                if let Ok(mut crosshair_transform) = transform_query.get_mut(crosshair_entity) {
-                    crosshair_transform.translation =
-                        (matrix * cursor_position.extend(0.).extend(1.)).truncate();
-                    if crosshair_transform.translation.x < 0. {
-                        scale_x = -1.;
-                    }
+        if player.spawned
+            && let Ok((crosshair_entity, crosshair_parent)) = bone_query.get(crosshair.bone)
+        {
+            let matrix = if let Ok(parent_transform) =
+                global_transform_query.get(crosshair_parent.parent())
+            {
+                parent_transform.to_matrix().inverse()
+            } else {
+                Mat4::IDENTITY
+            };
+            let mut scale_x = 1.;
+            if let Ok(mut crosshair_transform) = transform_query.get_mut(crosshair_entity) {
+                crosshair_transform.translation =
+                    (matrix * cursor_position.extend(0.).extend(1.)).truncate();
+                if crosshair_transform.translation.x < 0. {
+                    scale_x = -1.;
                 }
-                if let Ok(mut player_transform) = transform_query.get_mut(player_entity) {
-                    player_transform.scale.x = (scale_x * player_transform.scale.x).signum() * 0.25;
-                }
-                if let Some(mut aim_track) =
-                    spine.animation_state.track_at_index_mut(PLAYER_TRACK_AIM)
-                {
-                    let alpha = aim_track.alpha() * 2.5;
-                    aim_track
-                        .set_alpha(lerp::Lerp::lerp(alpha, 1., time.delta_secs()).clamp(0., 1.));
-                }
+            }
+            if let Ok(mut player_transform) = transform_query.get_mut(player_entity) {
+                player_transform.scale.x = (scale_x * player_transform.scale.x).signum() * 0.25;
+            }
+            if let Some(mut aim_track) = spine.animation_state.track_at_index_mut(PLAYER_TRACK_AIM)
+            {
+                let alpha = aim_track.alpha() * 2.5;
+                aim_track.set_alpha(lerp::Lerp::lerp(alpha, 1., time.delta_secs()).clamp(0., 1.));
             }
         }
     }

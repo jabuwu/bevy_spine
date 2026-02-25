@@ -145,10 +145,9 @@ impl SpineMaterial for MyMaterial {
             if let Some(slot) = spine
                 .skeleton
                 .slot_at_index(renderable_data.slot_index.unwrap_or(9999))
+                && slot.data().name().starts_with("portal")
             {
-                if slot.data().name().starts_with("portal") {
-                    material.time = 0.;
-                }
+                material.time = 0.;
             }
             Some(material)
         } else {

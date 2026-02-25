@@ -566,7 +566,7 @@ fn spine_load(
     );
 }
 
-#[allow(clippy::too_many_arguments)]
+#[allow(clippy::type_complexity)]
 fn spine_spawn(
     mut skeleton_query: Query<(
         &mut SpineLoader,
@@ -763,6 +763,7 @@ fn spine_spawn(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn spawn_bones(
     spine_entity: Entity,
     bone_parent: Option<SpineBoneParent>,
@@ -1181,35 +1182,35 @@ fn adjust_spine_textures(
             });
             // The RGB components exported from Spine were premultiplied in nonlinear space, but need to be
             // multiplied in linear space to render properly in Bevy.
-            if handle_config.premultiplied_alpha {
-                if let Some(data) = &mut image.data {
-                    for i in 0..(data.len() / 4) {
-                        let mut rgba = Srgba::rgba_u8(
-                            data[i * 4],
-                            data[i * 4 + 1],
-                            data[i * 4 + 2],
-                            data[i * 4 + 3],
+            if handle_config.premultiplied_alpha
+                && let Some(data) = &mut image.data
+            {
+                for i in 0..(data.len() / 4) {
+                    let mut rgba = Srgba::rgba_u8(
+                        data[i * 4],
+                        data[i * 4 + 1],
+                        data[i * 4 + 2],
+                        data[i * 4 + 3],
+                    );
+                    if rgba.alpha != 0. {
+                        rgba = Srgba::new(
+                            rgba.red / rgba.alpha,
+                            rgba.green / rgba.alpha,
+                            rgba.blue / rgba.alpha,
+                            rgba.alpha,
                         );
-                        if rgba.alpha != 0. {
-                            rgba = Srgba::new(
-                                rgba.red / rgba.alpha,
-                                rgba.green / rgba.alpha,
-                                rgba.blue / rgba.alpha,
-                                rgba.alpha,
-                            );
-                        } else {
-                            rgba = Srgba::new(0., 0., 0., 0.);
-                        }
-                        let mut linear_rgba = LinearRgba::from(rgba);
-                        linear_rgba.red *= linear_rgba.alpha;
-                        linear_rgba.green *= linear_rgba.alpha;
-                        linear_rgba.blue *= linear_rgba.alpha;
-                        rgba = Srgba::from(linear_rgba);
-                        data[i * 4] = (rgba.red * 255.) as u8;
-                        data[i * 4 + 1] = (rgba.green * 255.) as u8;
-                        data[i * 4 + 2] = (rgba.blue * 255.) as u8;
-                        data[i * 4 + 3] = (rgba.alpha * 255.) as u8;
+                    } else {
+                        rgba = Srgba::new(0., 0., 0., 0.);
                     }
+                    let mut linear_rgba = LinearRgba::from(rgba);
+                    linear_rgba.red *= linear_rgba.alpha;
+                    linear_rgba.green *= linear_rgba.alpha;
+                    linear_rgba.blue *= linear_rgba.alpha;
+                    rgba = Srgba::from(linear_rgba);
+                    data[i * 4] = (rgba.red * 255.) as u8;
+                    data[i * 4 + 1] = (rgba.green * 255.) as u8;
+                    data[i * 4 + 2] = (rgba.blue * 255.) as u8;
+                    data[i * 4 + 3] = (rgba.alpha * 255.) as u8;
                 }
             }
             removed_handles.push(handle_index);
