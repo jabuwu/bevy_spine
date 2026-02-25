@@ -19,6 +19,7 @@ bevy = { version = "0.18", default-features = false, features = [
   "bevy_render",
   "bevy_asset",
   "bevy_sprite",
+  "bevy_sprite_render",
 ] }
 glam = { version = "0.30", features = ["mint"] }
 thiserror = "2.0.18"

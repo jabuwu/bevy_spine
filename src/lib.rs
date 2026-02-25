@@ -10,7 +10,7 @@ use std::{
 
 use bevy::{
     asset::{RenderAssetUsages, load_internal_binary_asset},
-    camera::visibility::RenderLayers,
+    camera::{primitives::Aabb, visibility::RenderLayers},
     image::{ImageAddressMode, ImageFilterMode, ImageSampler, ImageSamplerDescriptor},
     mesh::{Indices, MeshVertexAttribute},
     prelude::*,
@@ -865,6 +865,7 @@ fn spine_update_meshes(
         Entity,
         &mut SpineMesh,
         &mut Transform,
+        Option<&mut Aabb>,
         Option<&Mesh2d>,
         Option<&Mesh3d>,
     )>,
@@ -874,6 +875,19 @@ fn spine_update_meshes(
     asset_server: Res<AssetServer>,
 ) {
     const CULLED_RECOVERY_INTERVAL_FRAMES: u32 = 60;
+
+    fn write_spine_mesh_aabb(
+        commands: &mut Commands,
+        spine_mesh_entity: Entity,
+        spine_mesh_aabb: &mut Option<Mut<Aabb>>,
+        mesh_aabb: Aabb,
+    ) {
+        if let Some(current_aabb) = spine_mesh_aabb {
+            **current_aabb = mesh_aabb;
+        } else if let Ok(mut entity) = commands.get_entity(spine_mesh_entity) {
+            entity.insert(mesh_aabb);
+        }
+    }
 
     for (meshes_parent, meshes_children, mut update_state) in meshes_query.iter_mut() {
         let Ok((mut spine, spine_mesh_type, inherited_visibility)) =
@@ -924,6 +938,7 @@ fn spine_update_meshes(
                 spine_mesh_entity,
                 mut spine_mesh,
                 mut spine_mesh_transform,
+                mut spine_mesh_aabb,
                 spine_2d_mesh,
                 spine_3d_mesh,
             )) = mesh_query.get_mut(child)
@@ -1027,6 +1042,25 @@ fn spine_update_meshes(
                     let Some(attachment_render_object) = attachment_renderer_object else {
                         break 'render;
                     };
+                    if vertices.is_empty() {
+                        break 'render;
+                    }
+
+                    let mut min_x = f32::INFINITY;
+                    let mut min_y = f32::INFINITY;
+                    let mut max_x = f32::NEG_INFINITY;
+                    let mut max_y = f32::NEG_INFINITY;
+                    for [x, y] in &vertices {
+                        min_x = min_x.min(*x);
+                        min_y = min_y.min(*y);
+                        max_x = max_x.max(*x);
+                        max_y = max_y.max(*y);
+                    }
+                    let mesh_aabb = Aabb::from_min_max(
+                        Vec3::new(min_x, min_y, 0.),
+                        Vec3::new(max_x, max_y, 0.),
+                    );
+
                     let spine_texture =
                         unsafe { &mut *(attachment_render_object as *mut SpineTexture) };
                     let texture_path = spine_texture.0.clone();
@@ -1052,12 +1086,24 @@ fn spine_update_meshes(
                         },
                     };
                     spine_mesh_transform.translation.z = z;
+                    write_spine_mesh_aabb(
+                        &mut commands,
+                        spine_mesh_entity,
+                        &mut spine_mesh_aabb,
+                        mesh_aabb,
+                    );
                     z += 0.001;
                     empty = false;
                 }
                 if empty {
                     spine_mesh.state = SpineMeshState::Empty;
                     empty_mesh(mesh);
+                    write_spine_mesh_aabb(
+                        &mut commands,
+                        spine_mesh_entity,
+                        &mut spine_mesh_aabb,
+                        Aabb::from_min_max(Vec3::ZERO, Vec3::ZERO),
+                    );
                 }
                 renderable_index += 1;
             }
@@ -1115,10 +1161,7 @@ fn adjust_spine_textures(
                 match filter {
                     AtlasFilter::Nearest => ImageFilterMode::Nearest,
                     AtlasFilter::Linear => ImageFilterMode::Linear,
-                    _ => {
-                        warn!("Unsupported Spine filter: {:?}", filter);
-                        ImageFilterMode::Nearest
-                    }
+                    _ => ImageFilterMode::Nearest,
                 }
             }
             fn convert_wrap(wrap: AtlasWrap) -> ImageAddressMode {
@@ -1126,10 +1169,7 @@ fn adjust_spine_textures(
                     AtlasWrap::ClampToEdge => ImageAddressMode::ClampToEdge,
                     AtlasWrap::MirroredRepeat => ImageAddressMode::MirrorRepeat,
                     AtlasWrap::Repeat => ImageAddressMode::Repeat,
-                    _ => {
-                        warn!("Unsupported Spine wrap mode: {:?}", wrap);
-                        ImageAddressMode::ClampToEdge
-                    }
+                    _ => ImageAddressMode::ClampToEdge,
                 }
             }
             image.sampler = ImageSampler::Descriptor(ImageSamplerDescriptor {

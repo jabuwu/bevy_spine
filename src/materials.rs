@@ -6,7 +6,7 @@ use std::marker::PhantomData;
 
 use bevy::asset::uuid_handle;
 use bevy::mesh::{MeshVertexAttribute, MeshVertexBufferLayoutRef};
-use bevy::sprite_render::{AlphaMode2d, Material2d, Material2dKey};
+use bevy::sprite_render::{AlphaMode2d, Material2d, Material2dKey, MeshMaterial2d};
 use bevy::{
     asset::Asset,
     ecs::system::{StaticSystemParam, SystemParam},
