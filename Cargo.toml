@@ -34,5 +34,5 @@ resolver = "2"
 members = ["ci"]
 
 [[example]]
-name = "ui_spine_showcase"
+name = "ui_showcase"
 required-features = ["ui"]

@@ -10,6 +10,7 @@ use std::{
 
 use bevy::{
     asset::{RenderAssetUsages, load_internal_binary_asset},
+    camera::visibility::RenderLayers,
     image::{ImageAddressMode, ImageFilterMode, ImageSampler, ImageSamplerDescriptor},
     mesh::{Indices, MeshVertexAttribute},
     prelude::*,
@@ -367,6 +368,9 @@ pub struct SpineSettings {
     pub update_meshes_when_invisible: bool,
 }
 
+#[derive(Component, Clone, Copy, Debug)]
+pub(crate) struct SpineRenderOwner;
+
 /// Mesh types to use in [`SpineSettings`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Reflect)]
 #[reflect(Debug, PartialEq, Clone)]
@@ -569,6 +573,8 @@ fn spine_spawn(
         Entity,
         &SkeletonDataHandle,
         Option<&Crossfades>,
+        Option<&RenderLayers>,
+        Option<&SpineRenderOwner>,
     )>,
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
@@ -576,7 +582,9 @@ fn spine_spawn(
     mut skeleton_data_assets: ResMut<Assets<SkeletonData>>,
     spine_event_queue: Res<SpineEventQueue>,
 ) {
-    for (mut spine_loader, spine_entity, data_handle, crossfades) in skeleton_query.iter_mut() {
+    for (mut spine_loader, spine_entity, data_handle, crossfades, render_layers, render_owner) in
+        skeleton_query.iter_mut()
+    {
         if let SpineLoader::Loading { with_children } = spine_loader.as_ref() {
             let skeleton_data_asset =
                 if let Some(skeleton_data_asset) = skeleton_data_assets.get_mut(&data_handle.0) {
@@ -662,49 +670,69 @@ fn spine_spawn(
                         });
                     controller.skeleton.set_to_setup_pose();
                     let mut bones = HashMap::new();
+                    let render_layers = render_layers.cloned();
+                    let render_owner = render_owner.copied();
                     if let Ok(mut entity_commands) = commands.get_entity(spine_entity) {
                         entity_commands
                             .with_children(|parent| {
                                 // TODO: currently, a mesh is created for each slot, however when we use the
                                 // combined drawer, this many meshes is usually not necessary. instead, we
                                 // may want to dynamically create meshes as needed in the render system
-                                parent
-                                    .spawn((
-                                        Name::new("spine_meshes"),
-                                        SpineMeshes,
-                                        SpineMeshesUpdateState::default(),
-                                        Transform::from_xyz(0., 0., 0.),
-                                        GlobalTransform::default(),
-                                        Visibility::default(),
-                                        InheritedVisibility::default(),
-                                        ViewVisibility::default(),
-                                    ))
-                                    .with_children(|parent| {
-                                        let mut z = 0.;
-                                        for (index, _) in controller.skeleton.slots().enumerate() {
-                                            let mut mesh = Mesh::new(
-                                                PrimitiveTopology::TriangleList,
-                                                RenderAssetUsages::MAIN_WORLD
-                                                    | RenderAssetUsages::RENDER_WORLD,
-                                            );
-                                            empty_mesh(&mut mesh);
-                                            let mesh_handle = meshes.add(mesh);
-                                            parent.spawn((
-                                                Name::new(format!("spine_mesh {index}")),
-                                                SpineMesh {
-                                                    spine_entity,
-                                                    handle: mesh_handle.clone(),
-                                                    state: SpineMeshState::Empty,
-                                                },
-                                                Transform::from_xyz(0., 0., z),
-                                                GlobalTransform::default(),
-                                                Visibility::default(),
-                                                InheritedVisibility::default(),
-                                                ViewVisibility::default(),
-                                            ));
-                                            z += 0.001;
+                                let render_layers_for_children = render_layers.clone();
+                                let mut spine_meshes_commands = parent.spawn((
+                                    Name::new("spine_meshes"),
+                                    SpineMeshes,
+                                    SpineMeshesUpdateState::default(),
+                                    Transform::from_xyz(0., 0., 0.),
+                                    GlobalTransform::default(),
+                                    Visibility::default(),
+                                    InheritedVisibility::default(),
+                                    ViewVisibility::default(),
+                                ));
+
+                                if let Some(render_layers) = &render_layers_for_children {
+                                    spine_meshes_commands.insert(render_layers.clone());
+                                }
+                                if let Some(render_owner) = render_owner {
+                                    spine_meshes_commands.insert(render_owner);
+                                }
+
+                                spine_meshes_commands.with_children(|parent| {
+                                    let render_layers_for_meshes =
+                                        render_layers_for_children.clone();
+                                    let mut z = 0.;
+                                    for (index, _) in controller.skeleton.slots().enumerate() {
+                                        let mut mesh = Mesh::new(
+                                            PrimitiveTopology::TriangleList,
+                                            RenderAssetUsages::MAIN_WORLD
+                                                | RenderAssetUsages::RENDER_WORLD,
+                                        );
+                                        empty_mesh(&mut mesh);
+                                        let mesh_handle = meshes.add(mesh);
+                                        let mut mesh_commands = parent.spawn((
+                                            Name::new(format!("spine_mesh {index}")),
+                                            SpineMesh {
+                                                spine_entity,
+                                                handle: mesh_handle.clone(),
+                                                state: SpineMeshState::Empty,
+                                            },
+                                            Transform::from_xyz(0., 0., z),
+                                            GlobalTransform::default(),
+                                            Visibility::default(),
+                                            InheritedVisibility::default(),
+                                            ViewVisibility::default(),
+                                        ));
+
+                                        if let Some(render_layers) = &render_layers_for_meshes {
+                                            mesh_commands.insert(render_layers.clone());
                                         }
-                                    });
+                                        if let Some(render_owner) = render_owner {
+                                            mesh_commands.insert(render_owner);
+                                        }
+
+                                        z += 0.001;
+                                    }
+                                });
                                 if *with_children {
                                     spawn_bones(
                                         spine_entity,
@@ -712,6 +740,8 @@ fn spine_spawn(
                                         parent,
                                         &controller.skeleton,
                                         controller.skeleton.bone_root().handle(),
+                                        render_layers_for_children.as_ref(),
+                                        render_owner.as_ref(),
                                         &mut bones,
                                     );
                                 }
@@ -739,6 +769,8 @@ fn spawn_bones(
     spawner: &mut ChildSpawnerCommands<'_>,
     skeleton: &Skeleton,
     bone: BoneHandle,
+    render_layers: Option<&RenderLayers>,
+    render_owner: Option<&SpineRenderOwner>,
     bones: &mut HashMap<String, Entity>,
 ) {
     if let Some(bone) = bone.get(skeleton) {
@@ -749,15 +781,23 @@ fn spawn_bones(
         transform.rotation = Quat::from_axis_angle(Vec3::Z, bone.applied_rotation().to_radians());
         transform.scale.x = bone.applied_scale_x();
         transform.scale.y = bone.applied_scale_y();
-        let bone_entity = spawner
-            .spawn((
-                Name::new(format!("spine_bone ({})", bone.data().name())),
-                transform,
-                GlobalTransform::default(),
-                Visibility::default(),
-                InheritedVisibility::default(),
-                ViewVisibility::default(),
-            ))
+        let mut bone_entity_commands = spawner.spawn((
+            Name::new(format!("spine_bone ({})", bone.data().name())),
+            transform,
+            GlobalTransform::default(),
+            Visibility::default(),
+            InheritedVisibility::default(),
+            ViewVisibility::default(),
+        ));
+
+        if let Some(render_layers) = render_layers {
+            bone_entity_commands.insert(render_layers.clone());
+        }
+        if let Some(render_owner) = render_owner {
+            bone_entity_commands.insert(*render_owner);
+        }
+
+        let bone_entity = bone_entity_commands
             .insert(SpineBone {
                 spine_entity,
                 handle: bone.handle(),
@@ -775,6 +815,8 @@ fn spawn_bones(
                         parent,
                         skeleton,
                         child.handle(),
+                        render_layers,
+                        render_owner,
                         bones,
                     );
                 }
