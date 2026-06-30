@@ -80,6 +80,7 @@ fn setup(
         SpineSettings {
             default_materials: false,
             mesh_type: SpineMeshType::Mesh3D,
+            direct_rendering: true,
             ..Default::default()
         },
     ));
