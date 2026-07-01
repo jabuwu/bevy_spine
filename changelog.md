@@ -8,12 +8,9 @@
 - Bump minimum Rust toolchain to 1.89.0.
 - Breaking: migrate from bundle-based spawning to Bevy required components.
   - Remove `SpineBundle`; spawn with `SkeletonDataHandle` + optional overrides.
-  - Remove `SpineUiBundle`; use `SpineUiNode` with `SpineUiSkeleton` for UI.
-- Add optional UI node rendering via the `ui` feature.
-- Add visibility-aware mesh updates for off-screen skeletons via
-  `SpineSettings::update_meshes_when_invisible` (defaults to `false`).
 - Add reflection support for core components and assets.
 - Fix culling correctness by updating dynamic Spine AABBs for frustum checks.
+- Add a simple render-to-texture UI example showing Spine inside a Bevy UI node.
 - Clippy and formatting cleanup.
 
 # 0.10.1

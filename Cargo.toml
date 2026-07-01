@@ -10,10 +10,6 @@ license-file = "LICENSE"
 rust-version = "1.95"
 exclude = ["assets/*"]
 
-[features]
-default = []
-ui = ["bevy/bevy_ui"]
-
 [dependencies]
 rusty_spine = "0.8"
 bevy = { version = "0.19.0", default-features = false, features = [
@@ -28,14 +24,8 @@ thiserror = "2.0.18"
 
 [dev-dependencies]
 lerp = "0.5"
-bevy = { version = "0.19.0", default-features = true, features = [
-  "bevy_ui_debug",
-] }
+bevy = { version = "0.19.0", default-features = true }
 
 [workspace]
 resolver = "2"
 members = ["ci"]
-
-[[example]]
-name = "ui_showcase"
-required-features = ["ui"]
